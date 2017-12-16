@@ -8,6 +8,7 @@ public class CameraEffects : MonoBehaviour {
 		const float MAX_DEEP = -1000;
 		float prevHeight;
 		private Material m_Material;
+	public Light seaLight;
 
 
 		void Start()
@@ -35,6 +36,7 @@ public class CameraEffects : MonoBehaviour {
 			if (pc < 0) pc = 0; 
 			else {if (pc > 1) pc = 1;}
 			m_Material.SetFloat("_DeepPercent", pc);
+			seaLight.intensity = pc;
 		}
 			if (m_Shader && m_Material)
 			{

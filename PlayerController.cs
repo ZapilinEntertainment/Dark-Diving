@@ -11,7 +11,6 @@ public class PlayerController : MonoBehaviour {
 
 	public float maxSpeed = 30, acceleration = 5, rotationSpeed = 5;
 	float speed, gravity = 0, height, prevHeight, waterlevel = 0;
-	bool speedIsFixed = false;
 
 	float energy;
 	public float energyCapacity = 500, lifeModuleConsumption = 0.001f, engineConsumption = 0.02f, maneuverConsumption = 0.01f;
@@ -24,11 +23,17 @@ public class PlayerController : MonoBehaviour {
 	public float maxHullPoints = 100;
 	float bottomDistance;
 
+	public Module[] modules;
+	public CapsuleCollider mainCollider; float length;
+	public GameObject marker;
+
 	void Awake() {
 		height = transform.position.y;
 		prevHeight = height;
 		hullPoints = maxHullPoints;
 		energy = energyCapacity;
+		length = mainCollider.height ;
+		marker.transform.position = transform.TransformPoint(Vector3.forward * length / modules.Length );
 	}
 
 	void Update () {
@@ -182,6 +187,22 @@ public class PlayerController : MonoBehaviour {
 			if (transform.localRotation.eulerAngles.x < 90) {sinkSmooth -= difSpeed; if (sinkSmooth < 0) sinkSmooth += difSpeed* 0.9f;}
 			else {sinkSmooth += difSpeed; if (sinkSmooth >0) sinkSmooth-= difSpeed * 0.9f;}
 		}
+	}
+
+	void ApplyDamage(Vector4 dmg) {
+		hullPoints -= dmg.w;
+		if (hullPoints < 0) Destruction();
+		float compartmentLength = length / modules.Length; //длина отсека
+		Vector3 inpoint = transform.InverseTransformPoint(new Vector3(dmg.x, dmg.y, dmg.z)) - mainCollider.center;
+		int compartmentNumber = (int) (inpoint.z / compartmentLength);
+		//print (compartmentNumber);
+		if (inpoint.z > 0) {compartmentNumber = modules.Length/2 - compartmentNumber - 1;}
+		else {compartmentNumber*= -1; compartmentNumber += modules.Length/2;}
+		//print ("Compartment "+compartmentNumber.ToString()+ " hit!");
+	}
+
+	void Destruction () {
+		
 	}
 
 	void OnGUI () {
