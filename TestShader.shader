@@ -4,6 +4,7 @@
 	{
 		_MainTex ("Texture", 2D) = "white" {}
 		_DeepPercent ("Deep level", Range (0,1)) = 0
+		_MyColor ("Sea Color", COLOR ) = (1,1,1,1)
 	}
 	SubShader
 	{
@@ -40,13 +41,15 @@
 			
 			sampler2D _MainTex;
 			float _DeepPercent;
+			fixed4 _MyColor;
 
 			fixed4 frag (v2f i) : SV_Target
 			{
 				fixed4 col = tex2D(_MainTex, i.uv);
-				col.r *= _DeepPercent;
-				col.g *= _DeepPercent;
-				col.b *=sin (_DeepPercent * 1.57);
+				col.r *= (1 - _DeepPercent); 
+				col.g *= 0.5 + (1 - _DeepPercent)/2;
+				col.b *= 0.5 + (1 - _DeepPercent)/2;
+				if (col.a = 0) col = _MyColor;
 				return col;
 			}
 			ENDCG
