@@ -27,6 +27,10 @@ public class PlayerController : MonoBehaviour {
 	public CapsuleCollider mainCollider; float length;
 	public GameObject marker;
 
+	public Material myMaterial;
+	float prevDepth;
+	public Color underwaterColor;
+
 	void Awake() {
 		height = transform.position.y;
 		prevHeight = height;
@@ -34,13 +38,14 @@ public class PlayerController : MonoBehaviour {
 		energy = energyCapacity;
 		length = mainCollider.height ;
 		marker.transform.position = transform.TransformPoint(Vector3.forward * length / modules.Length );
+		GameMaster.scenarist.SetPlayer (gameObject);
 	}
 
 	void Update () {
 		if (GameMaster.isPaused()) return;
 		float t = Time.deltaTime;
 		height = transform.position.y;
-		waterlevel = GameMaster.GetWaterlevel();
+		waterlevel = GameMaster.WATERLEVEL;
 		//наклон
 		float a = Vector3.Angle (transform.forward, Vector3.up);
 	
@@ -166,7 +171,7 @@ public class PlayerController : MonoBehaviour {
 			}
 		}
 
-		waterlevel = GameMaster.GetWaterlevel();
+		waterlevel = GameMaster.WATERLEVEL;
 		height = transform.position.y;
 		if ((prevHeight > waterlevel && height < waterlevel || prevHeight < waterlevel && height > waterlevel) && Mathf.Abs (height - prevHeight) > 0.02f) GameMaster.pool.Watersplash2At(transform.position);
 		prevHeight = height;

@@ -5,8 +5,8 @@ using UnityEngine;
 public class CameraEffects : MonoBehaviour {
 		public Shader m_Shader = null;
 	public float pc; // Процент погружения, 0 - на поверхности, 1 - там. куда не достаёт свет
-	const float MAX_DEEP = -2000, SUNLIGHT_LIMIT = 0.1f;
-	float prevHeight, colouringCooldown = 1, t;
+	const float SUNLIGHT_DEPTH = -200, SUNLIGHT_INTENSITY = 0.3f;
+	float prevHeight;
 		private Material m_Material;
 	public Light dayLight;
 	public Color normalSeaColor, mySeaColor;
@@ -28,17 +28,29 @@ public class CameraEffects : MonoBehaviour {
 				Debug.LogWarning(gameObject.name + ": Shader is not assigned. Disabling image effect.", this.gameObject);
 				enabled = false;
 			}
-		SetColors();
+		prevHeight = transform.position.y;
 		}
-
-	void Update () {
-		if (t > 0 ) {t -= Time.deltaTime;}
-	}
+		
 
 		void OnRenderImage(RenderTexture src, RenderTexture dst)
 		{		
 		if (transform.position.y != prevHeight) {
-			SetColors();
+			prevHeight = transform.position.y;
+
+			if (transform.position.y >= 0) pc = 0;
+			else {
+				pc = transform.position.y / GameMaster.LIGHT_DEPTH_LIMIT;
+				if (pc > 1) pc = 1;
+			}
+			m_Material.SetFloat("_DeepPercent", pc);
+			if (prevHeight > SUNLIGHT_DEPTH) { 
+				if (dayLight.enabled == false) dayLight.enabled = true;
+				float i = prevHeight / SUNLIGHT_DEPTH;
+				if (i <= 0) i = SUNLIGHT_INTENSITY;
+				else { if (i >= 1) i = 0; else i = 1 - i;}
+				if (dayLight.intensity != i) dayLight.intensity = i;
+			}
+			else {if (dayLight.enabled) dayLight.enabled = false;}
 		}
 
 			if (m_Shader && m_Material)
@@ -61,33 +73,5 @@ public class CameraEffects : MonoBehaviour {
 			}
 		}
 
-	void SetColors() {
-		float waterline = GameMaster.GetWaterlevel();
-		prevHeight = transform.position.y;
-		if (prevHeight >= waterline) pc = 0;
-		else {
-			if (prevHeight <= MAX_DEEP) pc = 1;
-			else pc = prevHeight / MAX_DEEP;
-		}
-		//Общее затенение
-		m_Material.SetFloat("_DeepPercent", pc);
-		// Global Illumination
-		Color environmentColor;
-		if (transform.position.y < waterline ) environmentColor = Color.Lerp(normalSeaColor, Color.black, pc);
-		else environmentColor = new Color (0.9f,0.9f,0.8f,0.1f);
-		if (environmentColor != prevColor) {
-			RenderSettings.ambientSkyColor= environmentColor;
-			skyboxMaterial.color = environmentColor;
-			prevColor = environmentColor;
-		}
-		RenderSettings.ambientIntensity=Mathf.Sin(pc * Mathf.PI);
-		RenderSettings.reflectionIntensity=(1-pc)/2;
-		//Солнечный свет
-		if (pc < SUNLIGHT_LIMIT) {
-			if (!dayLight.enabled) dayLight.enabled = true;
-			dayLight.intensity = (1 - pc/SUNLIGHT_LIMIT) *0.5f;
-		}
-		else {if (dayLight.enabled) {dayLight.intensity = 0;dayLight.enabled = false;}}
 
-	}
 }
