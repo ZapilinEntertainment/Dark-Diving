@@ -213,6 +213,7 @@ public class PlayerController : MonoBehaviour {
 	void OnGUI () {
 		GUILayout.Label((Mathf.Floor(speed * 100) / 100).ToString());
 		GUILayout.Label(bottomDistance.ToString()+ "u");
+		GUILayout.Label(GameMaster.cam.transform.rotation.eulerAngles.x.ToString());
 
 		if (!mainSkinSet) {GUI.skin.font = mainSkin.font;}
 		int sw = Screen.width;

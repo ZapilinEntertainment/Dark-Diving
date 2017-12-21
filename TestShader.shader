@@ -5,6 +5,7 @@
 		_MainTex ("Texture", 2D) = "white" {}
 		_DeepPercent ("Deep level", Range (0,1)) = 0
 		_MyColor ("Sea Color", COLOR ) = (1,1,1,1)
+		_DeltaPos("Sea Render y-axis deltapos", int) = 0
 	}
 	SubShader
 	{
@@ -41,6 +42,7 @@
 			
 			sampler2D _MainTex;
 			float _DeepPercent;
+			int _DeltaPos;
 			fixed4 _MyColor;
 
 			fixed4 frag (v2f i) : SV_Target
@@ -49,7 +51,11 @@
 				col.r *= (1 - _DeepPercent); 
 				col.g *= 0.5 + (1 - _DeepPercent)/2;
 				col.b *= 0.5 + (1 - _DeepPercent)/2;
-				if (col.a = 0) col = _MyColor;
+				//if (i.vertex.y > _ScreenParams.y/2 - _DeltaPos) {
+					//col.r = 1 - (1 - col.r)*(1-_MyColor.r);
+				    //col.g = 1 - (1 - col.g)*(1-_MyColor.g);
+				    // col.b = 1 - (1 - col.b)*(1-_MyColor.b);
+				//}
 				return col;
 			}
 			ENDCG
