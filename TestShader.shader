@@ -45,17 +45,24 @@
 			int _DeltaPos;
 			fixed4 _MyColor;
 
+
 			fixed4 frag (v2f i) : SV_Target
 			{
 				fixed4 col = tex2D(_MainTex, i.uv);
 				col.r *= (1 - _DeepPercent); 
 				col.g *= 0.5 + (1 - _DeepPercent)/2;
 				col.b *= 0.5 + (1 - _DeepPercent)/2;
-				//if (i.vertex.y > _ScreenParams.y/2 - _DeltaPos) {
-					//col.r = 1 - (1 - col.r)*(1-_MyColor.r);
-				    //col.g = 1 - (1 - col.g)*(1-_MyColor.g);
-				    // col.b = 1 - (1 - col.b)*(1-_MyColor.b);
-				//}
+				if (_DeepPercent > 0) {
+					col.r = 1 - (1 - col.r)*(1-_MyColor.r);
+				    col.g = 1 - (1 - col.g)*(1-_MyColor.g);
+				    col.b = 1 - (1 - col.b)*(1-_MyColor.b);
+
+				    //float time = _Time[1];
+				    //float2 waterDisplacement = (0, sin(time)/100.0);				
+					//float2 newUV = i.uv.xy + waterDisplacement;
+					//fixed4 col2 = tex2D(_MainTex, newUV);
+					//col *= col2;
+				}
 				return col;
 			}
 			ENDCG

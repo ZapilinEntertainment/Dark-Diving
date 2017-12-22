@@ -4,6 +4,7 @@
 		_MainTex ("Albedo (RGB)", 2D) = "white" {}
 		_BumpMap ("Bump map", 2D) = "grey" {}
 		_Bumpness ("Bump strength", Range(0,5)) = 1
+		_EmissionMap("Light map", 2D) = "black" {}
 		_Glossiness ("Smoothness", Range(0,1)) = 0.5
 		_Metallic ("Metallic", Range(0,1)) = 0.0
 		_LightLimit("LightlessDepth", float) = -2000
@@ -21,9 +22,11 @@
 
 		sampler2D _MainTex;
 		sampler2D _BumpMap;
+		sampler2D _EmissionMap;
 
 		struct Input {
           float2 uv_MainTex;
+          float2 uv_BumpMap;
           float3 worldPos;
       };
 
@@ -50,10 +53,12 @@
 			c.g *= 0.1 + (1 - depth)  * 0.9 ;
 			c.b *= 0.1 + (1 - depth)  * 0.9 ;
 			o.Albedo = c.rgb;
+			o.Normal = UnpackNormal(tex2D(_BumpMap, IN.uv_BumpMap));
 			// Metallic and smoothness come from slider variables
 			o.Metallic = _Metallic;
 			o.Smoothness = _Glossiness;
 			o.Alpha = c.a;
+			o.Emission = tex2D (_EmissionMap, IN.uv_MainTex) * (1 + depth * 3);
 		}
 		ENDCG
 	}

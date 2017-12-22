@@ -31,6 +31,12 @@ public class PlayerController : MonoBehaviour {
 	float prevDepth;
 	public Color underwaterColor;
 
+	public Light projector1, projector2;
+
+	int modulesCount = 6, modulesCapacity = 32;
+	bool showInventory = false;
+	int sh,sw;
+
 	void Awake() {
 		height = transform.position.y;
 		prevHeight = height;
@@ -39,10 +45,27 @@ public class PlayerController : MonoBehaviour {
 		length = mainCollider.height ;
 		marker.transform.position = transform.TransformPoint(Vector3.forward * length / modules.Length );
 		GameMaster.scenarist.SetPlayer (gameObject);
+		modules = new Module[modulesCount];
+		sw = Screen.width; sh= Screen.height; int k = GameMaster.GetGUIPiece();
+		for (int i =0; i< modulesCount; i++)
+		{
+			modules[i] = gameObject.AddComponent<Module>();
+			modules[i].number = i;
+			modules[i].capacity = modulesCapacity;
+			modules[i].SetRects(new Rect (0 + i * k, sh - k, k, k), new Rect(sw - 16 * k, 2*k + 4*i*k, 16*k, 4 *k));
+		}
 	}
 
 	void Update () {
 		if (GameMaster.isPaused()) return;
+		if (Input.GetKeyDown("p")) {projector1.enabled = !projector1.enabled;projector2.enabled = projector1.enabled;}
+		if (Input.GetKeyDown("i")) {
+			showInventory = !showInventory;
+			foreach (Module m in modules) {
+				m.showOnGUI = showInventory;
+			}
+		}
+
 		float t = Time.deltaTime;
 		height = transform.position.y;
 		waterlevel = GameMaster.WATERLEVEL;
@@ -216,9 +239,7 @@ public class PlayerController : MonoBehaviour {
 		GUILayout.Label(GameMaster.cam.transform.rotation.eulerAngles.x.ToString());
 
 		if (!mainSkinSet) {GUI.skin.font = mainSkin.font;}
-		int sw = Screen.width;
-		int sh = Screen.height;
-		int k = sh / 12;
+		int k = GameMaster.GetGUIPiece();
 		Rect rightPanelRect = new Rect (0, sh - k, 6*k, k);
 		GUI.DrawTexture (rightPanelRect, partsFrame_tx, ScaleMode.StretchToFill); rightPanelRect.y -= k/2; rightPanelRect.height = k/2;
 		GUI.Label (rightPanelRect, "Прочность корпуса: " + Mathf.FloorToInt(hullPoints/maxHullPoints * 100).ToString() + '%');

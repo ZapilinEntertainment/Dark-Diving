@@ -11,7 +11,6 @@ public class CameraEffects : MonoBehaviour {
 	public Light dayLight;
 	public Color normalSeaColor, mySeaColor;
 	public Material skyboxMaterial, bottomMaterial;
-	Color prevColor; 
 	Camera cam;
 
 	void Awake () {cam = gameObject.GetComponent<Camera>();}

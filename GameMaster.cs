@@ -9,9 +9,13 @@ static class GameMaster {
 	public static PoolMaster pool;
 	public static ScenarioManager scenarist;
 	public static LevelDesigner designer;
+	static int guiPiece = 16;
 
 
 	public static bool isPaused() {
 		return paused;
 	}
+
+	public static int GetGUIPiece () {return guiPiece;}
+	public static void SetGUIPiece (int k) {if (k<0) k = 16; guiPiece = k;}
 }
