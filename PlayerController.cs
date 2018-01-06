@@ -3,17 +3,16 @@ using System.Collections.Generic;
 using UnityEngine;
 
 public class PlayerController : MonoBehaviour {
-	public float lowBorder = 45, upBorder = 0;
 	const float ROTATION_SMOOTH_CF = 0.2f, SINK_SPEED = 9,SINKING_SMOOTH_CF = 1.1f, NATURAL_GRAVITY = 9.8f, NATURAL_WATER_MITIGATION = 3,
-	UNDERWATER_GRAVITY = 15, CRITICAL_X_ANGLE = 30;
+	CRITICAL_X_ANGLE = 30, SURFACE_EFFECT_DEPTH = 50, MOVEMENT_LIMIT = 0.001f;
 	//mitigation - смягчить (уменьшение гравитации при падении в воду)
 	public float sinkSmooth = 0, rotationSmooth = 0;
 
 	public float maxSpeed = 30, acceleration = 5, rotationSpeed = 5;
-	float speed, gravity = 0, height, prevHeight, waterlevel = 0;
+	float speed, height, prevHeight, waterlevel = 0;
 
 	float energy;
-	public float energyCapacity = 500, lifeModuleConsumption = 0.001f, engineConsumption = 0.02f, maneuverConsumption = 0.01f;
+	public float energyCapacity = 500, lifeModuleConsumption = 0.001f, engineConsumption = 0.02f, pumpConsumption = 0.01f;
 
 	public GUISkin mainSkin; bool mainSkinSet = false;
 	public Texture partsFrame_tx;
@@ -36,6 +35,17 @@ public class PlayerController : MonoBehaviour {
 	int modulesCount = 6, modulesCapacity = 32;
 	bool showInventory = false;
 	int sh,sw;
+	public float mass = 100, ballastMass = 0, maxBallastMass = 100, volume = 50 * 10 * 8 , pumpInSpeed= 10, pumpOutSpeed = 10; 
+	public float draft = 4; //осадка
+
+	Vector3 moveVector;
+	float savedSpeed = 0;
+	public float yForce = 0, realForce = 0, forceChangingSpeed = 10;
+	float flyTime = 0;
+	public float ballastCompression = 10;
+	public float physicDepth = 0;
+	public Transform sea;
+	public Vector3 seaCorrectionVector = new Vector3(-500,0,-500);
 
 	void Awake() {
 		height = transform.position.y;
@@ -58,6 +68,15 @@ public class PlayerController : MonoBehaviour {
 
 	void Update () {
 		if (GameMaster.isPaused()) return;
+
+		moveVector =Vector3.zero;
+		int directionVectorsCount = 0;
+
+		RaycastHit waterRaycaster;
+		float surfaceDist = 0;
+		var layerMask = 1<<4 ; //water layer
+		if (Physics.Raycast (transform.position + Vector3.up * 1000,Vector3.down, out waterRaycaster, Mathf.Infinity, layerMask )) surfaceDist = transform.position.y - waterRaycaster.point.y;
+
 		if (Input.GetKeyDown("p")) {projector1.enabled = !projector1.enabled;projector2.enabled = projector1.enabled;}
 		if (Input.GetKeyDown("i")) {
 			showInventory = !showInventory;
@@ -68,35 +87,48 @@ public class PlayerController : MonoBehaviour {
 
 		float t = Time.deltaTime;
 		height = transform.position.y;
-		waterlevel = GameMaster.WATERLEVEL;
+		waterlevel = waterRaycaster.point.y;
 		//наклон
 		float a = Vector3.Angle (transform.forward, Vector3.up);
 	
-		var layerMask = 1 << 9;
+		layerMask = 1 << 9;
 		if ( Physics.Raycast(transform.position, Vector3.down, out echoSounderRaycast, Mathf.Infinity, layerMask )) { bottomDistance = height - echoSounderRaycast.point.y;}
 		else bottomDistance = 1000;
 
-		if (height <= waterlevel) {
+		float pressure = (waterlevel - transform.position.y ) /10f + 1;
+		if (height <= waterlevel+draft) {  // Зона, где возможно управление кораблем -поверхность и под водой
+			flyTime = 0;
 			if (energy > 0) {
 				float sinkStep = SINK_SPEED * sinkSmooth * t;
 				if (Input.GetKey("q")) { 
 					sinkSmooth += SINKING_SMOOTH_CF * t; 
 					if (sinkSmooth > 1) sinkSmooth = 1;
-					energy -= maneuverConsumption * t;
+					if (ballastMass < maxBallastMass) {
+						ballastMass += pumpInSpeed * pressure * Time.deltaTime;
+						energy -= pumpConsumption * t;
+					}
+
 					if (Input.GetKey ("e")) {
-						energy -= maneuverConsumption * t;
-						if (bottomDistance > 0) transform.Translate (Vector3.down * SINK_SPEED * t, Space.World); 
+						if (ballastMass < maxBallastMass) {
+							ballastMass += pumpInSpeed * pressure;
+							energy -= pumpConsumption * t;
+						}
 						Differenting (t);
 					}
 				}
 				else {
-					if (Input.GetKey ("e")) { 
-						energy -= maneuverConsumption * t;
+					if (Input.GetKey ("e")) {
 						sinkSmooth -= SINKING_SMOOTH_CF * t; 
 						if (sinkSmooth < -1) sinkSmooth = -1;
+						if (ballastMass > 0) {
+							ballastMass -= pumpOutSpeed / pressure;
+							energy -= pumpConsumption * t;
+						}
 					}
 					else {	if (transform.localRotation.x != 0) Differenting( t ); }
 				}
+				if (ballastMass > maxBallastMass) ballastMass = maxBallastMass;
+				else if (ballastMass < 0) ballastMass = 0;
 
 				if (a > 179 && sinkSmooth > 0) sinkSmooth=0;
 				else { if (a < 45 && sinkSmooth < 0) sinkSmooth = 0;}
@@ -115,24 +147,19 @@ public class PlayerController : MonoBehaviour {
 			if (Input.GetKey ("d")) {
 					if (rotationSmooth < 1) {
 						rotationSmooth += ROTATION_SMOOTH_CF * t;
-						energy -= maneuverConsumption * t;
 					}
 				}
 			else {
 				if (Input.GetKey ("a")) {
 						if (rotationSmooth > -1) {
 							rotationSmooth -= ROTATION_SMOOTH_CF * t;
-							energy -= maneuverConsumption * t;
 						}
 					}
 				else rotationSmooth = Mathf.SmoothDamp(rotationSmooth, 0,  ref rotationSmooth, t * 3);
 			}
 			if (rotationSmooth != 0) transform.Rotate (Vector3.up * rotationSmooth * t * rotationSpeed * speed / maxSpeed, Space.World);
 
-				gravity = Mathf.SmoothDamp(gravity, 0, ref gravity, t);
-				if (height > upBorder) transform.Translate (Vector3.down * 10 * t, Space.World);
-				else { if (height < lowBorder) transform.Translate (Vector3.up * 5 * t, Space.World);}
-
+				//STABILIZE  Z-AXIS
 				float trz = transform.localRotation.eulerAngles.z;
 				if (trz!= 0) {
 					if (trz > 180) transform.Rotate (Vector3.forward * rotationSpeed * t , Space.Self);
@@ -144,62 +171,77 @@ public class PlayerController : MonoBehaviour {
 					}
 				}
 
-				if (Input.GetKey(KeyCode.Space) && height < upBorder) {
-					transform.Translate(Vector3.up * 3 *t , Space.World);
-					energy -= 2 * maneuverConsumption * t;
-				}
-				if (gravity > 0) {gravity -= 3 *t; if (gravity < 0) gravity = 0;}
-			}
-			else { // OUT OF ENERGY
-				if (gravity != 0) {
-					if (gravity < UNDERWATER_GRAVITY) {gravity += NATURAL_GRAVITY * t; if (gravity > UNDERWATER_GRAVITY) gravity = UNDERWATER_GRAVITY;}
-					else { 
-						if (gravity > UNDERWATER_GRAVITY) { gravity -= NATURAL_WATER_MITIGATION * t ; if (gravity < UNDERWATER_GRAVITY) gravity = UNDERWATER_GRAVITY;}
+				if (Input.GetKey(KeyCode.Space)) {
+					if (energy > 0 && ballastMass > 0) {
+						ballastMass -= 2 * pumpOutSpeed * Time.deltaTime;
+						energy -= 2 * pumpConsumption * Time.deltaTime;
 					}
 				}
+			}
+			else { // OUT OF ENERGY
 				float trx = transform.localRotation.eulerAngles.x;
 				if (bottomDistance > 0 && (trx > CRITICAL_X_ANGLE && trx < 360 - CRITICAL_X_ANGLE)) {
-					if (trx < 45) {transform.Translate(Vector3.forward * 5 * t, Space.Self); gravity += 0.01f;}
+					if (trx < 45) {moveVector += transform.TransformDirection(Vector3.forward * 5 * t); directionVectorsCount++; yForce -= 0.01f;}
 					else {
-						if (trx > 270) {transform.Translate(Vector3.back * 5 * t, Space.Self); gravity += 0.01f;}
+						if (trx > 270) {moveVector += transform.TransformDirection(Vector3.back * 5 * t); directionVectorsCount++; yForce -= 0.01f;}
 							}
 				}
 				if (speed > 0) {speed -= NATURAL_WATER_MITIGATION * t; if (speed < 0) speed = 0;}
 			}
 		}
-		else {
-			if (bottomDistance > 0) {
-				gravity += NATURAL_GRAVITY* t;
-				if (speed > 0) {speed -= 10 * t; }
-				if (speed < 0) speed = 0;
+		else { 
+			flyTime += t; pressure = 0;
+			if (Input.GetKey ("e") && energy > 0) {
+				if (ballastMass > 0) {
+					ballastMass -= pumpOutSpeed * t;
+					energy -= pumpConsumption * t;
+				}
 			}
 		}
+
+
+	
+		if (transform.position.y < waterlevel) {
+			float k = ( 1 - transform.position.y - (waterlevel - draft)) / (2 * draft);
+			if (k < 0) k *= (-1);
+			yForce = pressure * NATURAL_GRAVITY * volume  - (mass + ballastMass * ballastCompression) * NATURAL_GRAVITY;
+		}
+		else {
+			yForce = -(mass + ballastMass * ballastCompression) * NATURAL_GRAVITY * (1 +flyTime);
+		}
+
+		yForce /= (mass + ballastMass * ballastCompression);
+		physicDepth = (mass + ballastMass * ballastCompression) / volume - 1;
+		physicDepth *= 10;
+
+		if (realForce + MOVEMENT_LIMIT < yForce ) {realForce += forceChangingSpeed * Time.deltaTime; if (realForce > yForce) realForce = yForce;}
+		else if (realForce > yForce + MOVEMENT_LIMIT) {realForce -= forceChangingSpeed * Time.deltaTime; if (realForce < yForce) realForce = yForce;}
+
+		transform.Translate (Vector3.up * realForce * Time.deltaTime,Space.World);
+
+
 			
-			if (speed != 0 ) {
+		height = transform.position.y;
+
+		bool jumpDown = prevHeight > waterlevel && height < waterlevel ;
+		bool jumpUp = prevHeight < waterlevel && height > waterlevel;
+		//if ((jumpDown || jumpUp) && gravity > 10) GameMaster.pool.Watersplash2At(transform.position);
+		prevHeight = height;
+
+		if (energy > 0) {energy -= (lifeModuleConsumption + engineConsumption * Mathf.Abs(speed)) * t; if (energy < 0) energy = 0;}
+
+
+		if (speed != 0 ) {
 			bool blocked = false;
 			if (Physics.Raycast(transform.position, transform.forward, out forwardRaycast, speed * t)) {
 				if (forwardRaycast.collider.gameObject.layer == 9) blocked = true;
 			}
-			if (blocked ==false) transform.Translate(Vector3.forward * speed * t, Space.Self);
+			if (blocked ==false) transform.Translate(Vector3.forward * speed * Time.deltaTime, Space.Self);
 			if (bottomDistance < 1.2f) GameMaster.pool.Dustsplash2At(transform.position);
 		}
 
-		if (gravity != 0) {
-			transform.rotation = Quaternion.RotateTowards( transform.rotation, Quaternion.LookRotation(Vector3.down), NATURAL_GRAVITY * t / 2);
-			if (bottomDistance >= gravity * t) transform.Translate (Vector3.down * gravity * t, Space.World);
-			else {
-				gravity = 0;
-				transform.position = echoSounderRaycast.point;
-				GameMaster.pool.Dustsplash2At(transform.position);
-			}
-		}
-
-		waterlevel = GameMaster.WATERLEVEL;
-		height = transform.position.y;
-		if ((prevHeight > waterlevel && height < waterlevel || prevHeight < waterlevel && height > waterlevel) && Mathf.Abs (height - prevHeight) > 0.02f) GameMaster.pool.Watersplash2At(transform.position);
-		prevHeight = height;
-
-		if (energy > 0) {energy -= (lifeModuleConsumption + engineConsumption * Mathf.Abs(speed)) * t; if (energy < 0) energy = 0;}
+		if (directionVectorsCount != 0)	transform.position += moveVector / directionVectorsCount;
+		sea.position = new Vector3(transform.position.x, 0, transform.position.z) + seaCorrectionVector;
 	}
 
 	void Differenting (float t) {
@@ -211,7 +253,7 @@ public class PlayerController : MonoBehaviour {
 		}
 		else {
 			float difSpeed = SINK_SPEED * t /2;
-			if (Mathf.Abs(height - upBorder) > 1) difSpeed/=4;
+			if (Mathf.Abs(height - waterlevel) > 1) difSpeed/=4;
 			if (transform.localRotation.eulerAngles.x < 90) {sinkSmooth -= difSpeed; if (sinkSmooth < 0) sinkSmooth += difSpeed* 0.9f;}
 			else {sinkSmooth += difSpeed; if (sinkSmooth >0) sinkSmooth-= difSpeed * 0.9f;}
 		}
@@ -232,6 +274,7 @@ public class PlayerController : MonoBehaviour {
 	void Destruction () {
 		
 	}
+		
 
 	void OnGUI () {
 		GUILayout.Label((Mathf.Floor(speed * 100) / 100).ToString());

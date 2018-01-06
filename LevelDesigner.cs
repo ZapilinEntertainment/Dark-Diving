@@ -24,6 +24,7 @@ public class LevelDesigner : MonoBehaviour {
 
 	void Awake () {
 		GameMaster.designer = this;
+		startPos = circlesCount *2 * RADIUS * new Vector3(-1,0,1);
 	}
 
 	void Start () {

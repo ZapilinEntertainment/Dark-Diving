@@ -12,8 +12,13 @@ public class CameraEffects : MonoBehaviour {
 	public Color normalSeaColor, mySeaColor;
 	public Material skyboxMaterial, bottomMaterial;
 	Camera cam;
+	float surfaceHeight;
 
-	void Awake () {cam = gameObject.GetComponent<Camera>();}
+
+	void Awake () {
+		cam = gameObject.GetComponent<Camera>();
+		surfaceHeight = 0;
+	}
 
 		void Start()
 		{  
@@ -24,9 +29,9 @@ public class CameraEffects : MonoBehaviour {
 				m_Material.hideFlags = HideFlags.HideAndDontSave;
 			m_Material.SetColor("_MyColor", mySeaColor);
 			if (transform.position.y >= 0) pc = 0;
-				else {
-					pc = transform.position.y / GameMaster.LIGHT_DEPTH_LIMIT;
-					if (pc > 1) pc = 1;
+			else {
+				pc = transform.position.y / GameMaster.LIGHT_DEPTH_LIMIT;
+				if (pc > 1) pc = 1;
 				}
 				m_Material.SetFloat("_DeepPercent", pc);
 			SetBackgroundColor();
@@ -42,25 +47,28 @@ public class CameraEffects : MonoBehaviour {
 
 		void OnRenderImage(RenderTexture src, RenderTexture dst)
 		{		
+
+		float surfaceDist = 0;
+		var layerMask = 1<<4;
+		RaycastHit rh;
+		if (Physics.Raycast (transform.position + Vector3.up * 1000,Vector3.down, out rh, Mathf.Infinity, layerMask )) {
+			surfaceHeight = rh.point.y;
+		}
+		surfaceDist = transform.position.y - surfaceHeight;
+
+		if (surfaceDist > 0) pc = 0;
+		else {
+			pc = surfaceDist / GameMaster.LIGHT_DEPTH_LIMIT  ;
+			if (pc > 1) pc =1;
+		}
+		m_Material.SetFloat("_DeepPercent", pc);
+		//pc = 1 - полная темнота
+
+			
+
+
 		if (Mathf.Abs(transform.position.y - prevHeight) >= DELTA_LIMIT) {
 			prevHeight = transform.position.y;
-			if (transform.position.y >= 0) {
-				pc = 0;
-			}
-			else {
-				pc = transform.position.y / GameMaster.LIGHT_DEPTH_LIMIT;
-				if (pc > 1) pc = 1;
-
-			}
-			m_Material.SetFloat("_DeepPercent", pc);
-			int deltaPos = 0;
-			if (transform.position.y < GameMaster.WATERLEVEL) {deltaPos = Screen.height/2;}
-			else {
-				float ax = transform.rotation.eulerAngles.x;
-				deltaPos = (int)(Screen.height/2 * Mathf.Sin(ax* Mathf.PI));
-			}
-			m_Material.SetInt ("_DeltaPos", deltaPos);
-
 			if (prevHeight > SUNLIGHT_DEPTH) { 
 				if (dayLight.enabled == false) dayLight.enabled = true;
 				float i = prevHeight / SUNLIGHT_DEPTH;
