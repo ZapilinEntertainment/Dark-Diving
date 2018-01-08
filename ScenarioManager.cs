@@ -7,9 +7,11 @@ public class ScenarioManager : MonoBehaviour {
 	Vector3 playerPos;
 	Hex currentLocation;
 	float hexUpdateTime = 1.5f, t = 0;
+	public static ScenarioManager scenarist;
 
 	void Awake () {
-		GameMaster.scenarist = this;
+		if (scenarist != null) Destroy(scenarist);
+		scenarist = this;
 	}
 		
 

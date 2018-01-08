@@ -66,7 +66,7 @@ public class LevelDesigner : MonoBehaviour {
 		shipMarker = Instantiate(cellRenderer_pref) as GameObject;
 		shipMarker.transform.parent = cameraTransform;
 		//shipMarker.transform.localScale = Vector3.one * radius;
-		shipMarker.transform.localRotation = Quaternion.Euler(0,0,GameMaster.scenarist.GetPlayerRotation().eulerAngles.y * (-1));
+		shipMarker.transform.localRotation = Quaternion.Euler(0,0,ScenarioManager.scenarist.GetPlayerRotation().eulerAngles.y * (-1));
 		shipMarker.GetComponent<SpriteRenderer>().sprite = shipSprite_tx;
 		shipMarker.SetActive(false);
 	}
@@ -98,9 +98,9 @@ public class LevelDesigner : MonoBehaviour {
 	void LateUpdate() {
 		if (GameMaster.isPaused()) return;
 		if (mapEnabled) {
-			Vector3 delta = GameMaster.scenarist.GetPlayerPosition() - hex[0,0].GetWorldPosition(); delta.y = delta.z; delta.z = -0.005f;
+			Vector3 delta = ScenarioManager.scenarist.GetPlayerPosition() - hex[0,0].GetWorldPosition(); delta.y = delta.z; delta.z = -0.005f;
 			shipMarker.transform.localPosition = hexRenderers[0,0].transform.localPosition + delta * distanceCoefficient;
-			shipMarker.transform.localRotation = Quaternion.Euler(0,0,GameMaster.scenarist.GetPlayerRotation().eulerAngles.y * (-1)) ;		
+			shipMarker.transform.localRotation = Quaternion.Euler(0,0,ScenarioManager.scenarist.GetPlayerRotation().eulerAngles.y * (-1)) ;		
 		}
 	}
 

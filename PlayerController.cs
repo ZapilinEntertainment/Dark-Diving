@@ -4,7 +4,7 @@ using UnityEngine;
 
 public class PlayerController : MonoBehaviour {
 	const float ROTATION_SMOOTH_CF = 0.2f, SINK_SPEED = 9,SINKING_SMOOTH_CF = 1.1f, NATURAL_GRAVITY = 9.8f, NATURAL_WATER_MITIGATION = 3,
-	CRITICAL_X_ANGLE = 30, SURFACE_EFFECT_DEPTH = 50, MOVEMENT_LIMIT = 0.001f;
+	CRITICAL_X_ANGLE = 30, FORCE_CONSTANCE_TIMER = 0.04f;
 	//mitigation - смягчить (уменьшение гравитации при падении в воду)
 	public float sinkSmooth = 0, rotationSmooth = 0;
 
@@ -22,8 +22,8 @@ public class PlayerController : MonoBehaviour {
 	public float maxHullPoints = 100;
 	float bottomDistance;
 
-	public Module[] modules;
-	public CapsuleCollider mainCollider; float length;
+	Module[] modules;
+	public CapsuleCollider mainCollider; 
 	public GameObject marker;
 
 	public Material myMaterial;
@@ -35,8 +35,9 @@ public class PlayerController : MonoBehaviour {
 	int modulesCount = 6, modulesCapacity = 32;
 	bool showInventory = false;
 	int sh,sw;
-	public float mass = 100, ballastMass = 0, maxBallastMass = 100, volume = 50 * 10 * 8 , pumpInSpeed= 10, pumpOutSpeed = 10; 
-	public float draft = 4; //осадка
+
+	public float mass = 100, ballastMass = 0, maxBallastMass = 100, volume = 1, pumpInSpeed= 10, pumpOutSpeed = 10; 
+	public float draft = 4, length = 1, width = 8; //осадка, длина, ширина
 
 	Vector3 moveVector;
 	float savedSpeed = 0;
@@ -46,27 +47,48 @@ public class PlayerController : MonoBehaviour {
 	public float physicDepth = 0;
 	public Transform sea;
 	public Vector3 seaCorrectionVector = new Vector3(-500,0,-500);
+	float forceTimer = 0;
+
+	static PlayerController player;
+
 
 	void Awake() {
+		//singleton pattern
+		if (player != null) Destroy(player);
+		player = this;
+		ScenarioManager.scenarist.SetPlayer(gameObject);
+
 		height = transform.position.y;
 		prevHeight = height;
 		hullPoints = maxHullPoints;
 		energy = energyCapacity;
 		length = mainCollider.height ;
-		marker.transform.position = transform.TransformPoint(Vector3.forward * length / modules.Length );
-		GameMaster.scenarist.SetPlayer (gameObject);
+		volume = draft * 2 * length * width;
+		//marker.transform.position = transform.TransformPoint(Vector3.forward * length / modules.Length );
 		modules = new Module[modulesCount];
 		sw = Screen.width; sh= Screen.height; int k = GameMaster.GetGUIPiece();
+		Module.MODULE_INFO_RECT = new Rect(sw - 10 *k, sh - 10*k, 10*k, 10*k);
 		for (int i =0; i< modulesCount; i++)
 		{
 			modules[i] = gameObject.AddComponent<Module>();
-			modules[i].number = i;
-			modules[i].capacity = modulesCapacity;
+			modules[i].ModuleSet(i, Module.SMALL_MODULE_CAPACITY, ModuleType.Empty,this);
 			modules[i].SetRects(new Rect (0 + i * k, sh - k, k, k), new Rect(sw - 16 * k, 2*k + 4*i*k, 16*k, 4 *k));
 		}
+			
+		modules[0].AddItem(Item.item_metal);
+		modules[0].AddItem(Item.item_dragmetal);
+		modules[0].AddItem(Item.item_chemicals);
+		modules[0].AddItem(Item.item_electronic);
+		modules[0].AddItem(Item.item_plastic);
+		modules[0].AddItem(Item.item_people);
 	}
 
 	void Update () {
+
+		//testzone
+		if (Input.GetKeyDown("g")) modules[0].AddItem(Item.item_people);
+		//end of testzone
+		GameMaster.cursorPosition = new Vector2(Input.mousePosition.x, sh - Input.mousePosition.y);
 		if (GameMaster.isPaused()) return;
 
 		moveVector =Vector3.zero;
@@ -74,8 +96,8 @@ public class PlayerController : MonoBehaviour {
 
 		RaycastHit waterRaycaster;
 		float surfaceDist = 0;
-		var layerMask = 1<<4 ; //water layer
-		if (Physics.Raycast (transform.position + Vector3.up * 1000,Vector3.down, out waterRaycaster, Mathf.Infinity, layerMask )) surfaceDist = transform.position.y - waterRaycaster.point.y;
+		var waterLayerMask = 1<<4 ; //water layer
+		if (Physics.Raycast (transform.position + Vector3.up * 1000,Vector3.down, out waterRaycaster, Mathf.Infinity, waterLayerMask )) surfaceDist = transform.position.y - waterRaycaster.point.y;
 
 		if (Input.GetKeyDown("p")) {projector1.enabled = !projector1.enabled;projector2.enabled = projector1.enabled;}
 		if (Input.GetKeyDown("i")) {
@@ -91,8 +113,8 @@ public class PlayerController : MonoBehaviour {
 		//наклон
 		float a = Vector3.Angle (transform.forward, Vector3.up);
 	
-		layerMask = 1 << 9;
-		if ( Physics.Raycast(transform.position, Vector3.down, out echoSounderRaycast, Mathf.Infinity, layerMask )) { bottomDistance = height - echoSounderRaycast.point.y;}
+		var bottomLayerMask = 1 << 9;
+		if ( Physics.Raycast(transform.position, Vector3.down, out echoSounderRaycast, Mathf.Infinity, bottomLayerMask )) { bottomDistance = height - echoSounderRaycast.point.y;}
 		else bottomDistance = 1000;
 
 		float pressure = (waterlevel - transform.position.y ) /10f + 1;
@@ -188,6 +210,32 @@ public class PlayerController : MonoBehaviour {
 				}
 				if (speed > 0) {speed -= NATURAL_WATER_MITIGATION * t; if (speed < 0) speed = 0;}
 			}
+
+			float waterlevelDist = Mathf.Abs(transform.position.y - waterlevel);
+			if (waterlevelDist < GameMaster.SURFACE_EFFECT_DEPTH) {
+				float k = 1 - waterlevelDist /  GameMaster.SURFACE_EFFECT_DEPTH;
+				float waterlevel_fwd = waterlevel, waterlevel_aft = waterlevel;
+				Vector3 fwd_point = transform.position + transform.forward * length / 2;
+				Vector3 aft_point = transform.position - transform.forward * length /2;
+				if (Physics.Raycast(fwd_point + Vector3.up * 1000, Vector3.down, out waterRaycaster, Mathf.Infinity, waterLayerMask)) {
+					waterlevel_fwd = waterRaycaster.point.y;
+				}
+				if (Physics.Raycast(aft_point + Vector3.up * 1000, Vector3.down, out waterRaycaster, Mathf.Infinity, waterLayerMask)) {
+					waterlevel_aft = waterRaycaster.point.y;
+				}
+		
+				if ((waterlevel_fwd - fwd_point.y) < 0 && (waterlevel_aft - aft_point.y) > 0) {
+					sinkSmooth += SINKING_SMOOTH_CF * t * k *k * 2; 
+					if (sinkSmooth > 1) sinkSmooth = 1;
+				}
+				else {
+					if ((waterlevel_fwd - fwd_point.y) > 0 && (waterlevel_aft - aft_point.y) < 0) {
+						sinkSmooth -= SINKING_SMOOTH_CF * t * k *k * 2; 
+						if (sinkSmooth < -1) sinkSmooth = -1;
+					}
+				}
+
+			}
 		}
 		else { 
 			flyTime += t; pressure = 0;
@@ -200,24 +248,44 @@ public class PlayerController : MonoBehaviour {
 		}
 
 
-	
-		if (transform.position.y < waterlevel) {
-			float k = ( 1 - transform.position.y - (waterlevel - draft)) / (2 * draft);
-			if (k < 0) k *= (-1);
-			yForce = pressure * NATURAL_GRAVITY * volume  - (mass + ballastMass * ballastCompression) * NATURAL_GRAVITY;
-		}
+		if (forceTimer > 0) forceTimer-= Time.deltaTime;
 		else {
-			yForce = -(mass + ballastMass * ballastCompression) * NATURAL_GRAVITY * (1 +flyTime);
+			float prevForce = yForce;
+			if (transform.position.y < waterlevel) {
+				float k = ( 1 - transform.position.y - (waterlevel - draft)) / (2 * draft);
+				if (k < 0) k *= (-1);
+				float surface_cf = 1;
+				if (waterlevel - transform.position.y < draft) surface_cf = GameMaster.seaStrength;
+				yForce = pressure * NATURAL_GRAVITY * volume *surface_cf   - (mass + ballastMass * ballastCompression) * NATURAL_GRAVITY;
+
+			}
+			else {
+				yForce = -(mass + ballastMass * ballastCompression) * NATURAL_GRAVITY * (1 +flyTime);
+				if (transform.position.y - waterlevel >draft) yForce /= GameMaster.seaStrength;
+			}
+
+			yForce /= (mass + ballastMass * ballastCompression);
+			physicDepth = (mass + ballastMass * ballastCompression) / volume - 1;
+			physicDepth *= -10;
+
+			if (prevForce != realForce)	{
+				forceTimer = FORCE_CONSTANCE_TIMER;
+			}
 		}
+			if (realForce< yForce ) {
+			if (waterlevel - transform.position.y > draft ) realForce += (forceChangingSpeed+ pressure) * Time.deltaTime; 
+			if (realForce > yForce) realForce = yForce;
+		}
+			else if (realForce > yForce) {
+			if (transform.position.y  - waterlevel > draft) {
+				realForce -= (forceChangingSpeed+ NATURAL_GRAVITY *flyTime*mass * 0.5f) * Time.deltaTime; 
+				sinkSmooth += SINKING_SMOOTH_CF * t; 
+				if (sinkSmooth > 1) sinkSmooth = 1;
+			}
+			else realForce -= forceChangingSpeed * Time.deltaTime; 
+			if (realForce < yForce) realForce = yForce;}
 
-		yForce /= (mass + ballastMass * ballastCompression);
-		physicDepth = (mass + ballastMass * ballastCompression) / volume - 1;
-		physicDepth *= 10;
-
-		if (realForce + MOVEMENT_LIMIT < yForce ) {realForce += forceChangingSpeed * Time.deltaTime; if (realForce > yForce) realForce = yForce;}
-		else if (realForce > yForce + MOVEMENT_LIMIT) {realForce -= forceChangingSpeed * Time.deltaTime; if (realForce < yForce) realForce = yForce;}
-
-		transform.Translate (Vector3.up * realForce * Time.deltaTime,Space.World);
+			transform.Translate (Vector3.up * realForce * Time.deltaTime,Space.World);
 
 
 			
@@ -225,7 +293,7 @@ public class PlayerController : MonoBehaviour {
 
 		bool jumpDown = prevHeight > waterlevel && height < waterlevel ;
 		bool jumpUp = prevHeight < waterlevel && height > waterlevel;
-		//if ((jumpDown || jumpUp) && gravity > 10) GameMaster.pool.Watersplash2At(transform.position);
+		if (jumpUp || jumpDown) {realForce *= 0.5f;}
 		prevHeight = height;
 
 		if (energy > 0) {energy -= (lifeModuleConsumption + engineConsumption * Mathf.Abs(speed)) * t; if (energy < 0) energy = 0;}
@@ -237,7 +305,7 @@ public class PlayerController : MonoBehaviour {
 				if (forwardRaycast.collider.gameObject.layer == 9) blocked = true;
 			}
 			if (blocked ==false) transform.Translate(Vector3.forward * speed * Time.deltaTime, Space.Self);
-			if (bottomDistance < 1.2f) GameMaster.pool.Dustsplash2At(transform.position);
+			if (bottomDistance < 1.2f) PoolMaster.mainPool.Dustsplash2At(transform.position);
 		}
 
 		if (directionVectorsCount != 0)	transform.position += moveVector / directionVectorsCount;
@@ -274,12 +342,19 @@ public class PlayerController : MonoBehaviour {
 	void Destruction () {
 		
 	}
+
+	public Module GetModule(int index) {
+		if (index < 0 || index > modules.Length) return null;
+		return modules[index];
+	}
 		
 
 	void OnGUI () {
+		if (false) {
 		GUILayout.Label((Mathf.Floor(speed * 100) / 100).ToString());
 		GUILayout.Label(bottomDistance.ToString()+ "u");
-		GUILayout.Label(GameMaster.cam.transform.rotation.eulerAngles.x.ToString());
+		GUILayout.Label(GameMaster.cursorPosition.ToString());
+		}
 
 		if (!mainSkinSet) {GUI.skin.font = mainSkin.font;}
 		int k = GameMaster.GetGUIPiece();
