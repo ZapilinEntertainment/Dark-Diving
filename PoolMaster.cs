@@ -13,6 +13,7 @@ public class PoolMaster : MonoBehaviour {
 	const int WAVE_TX_RES = 512;
 	public Material waterMaterial;
 	public static PoolMaster mainPool;
+	public GameObject city_housing_pref, city_mall_pref, city_offices_pref, city_industrial_pref;
 
 	void Awake () {
 		//singleton pattern

@@ -22,9 +22,12 @@ public class LevelDesigner : MonoBehaviour {
 	float mapCoefficient = 0.1f, distanceCoefficient = 0.1f;
 	Color brownColor = new Color (128, 0, 0);
 
+	public GameObject TESTING_HEX;
+
 	void Awake () {
 		GameMaster.designer = this;
 		startPos = circlesCount *2 * RADIUS * new Vector3(-1,0,1);
+		if (TESTING_HEX != null) {new Hex(0,0,-9000, TESTING_HEX, BiomeType.city);}
 	}
 
 	void Start () {
@@ -107,7 +110,7 @@ public class LevelDesigner : MonoBehaviour {
 	void Gen1 () {
 		GameObject g = Instantiate(clearHex, startPos, Quaternion.identity) as GameObject;
 		g.name = "(0,0)";
-		float ang = 0, rad = 0;
+		float rad = 0;
 		Vector3 pos = startPos;
 		for (int n = 0; n < circlesCount; n++) {
 			int hexCount = 6;
@@ -123,7 +126,7 @@ public class LevelDesigner : MonoBehaviour {
 		}
 	}
 
-	void Gen2 (int width,int height) {
+	void Gen2 (int width,int height) {  //CURRENT GENERATOR
 		hex = new Hex[width, height];
 		GameObject g; 
 		string nm = "";
@@ -142,14 +145,23 @@ public class LevelDesigner : MonoBehaviour {
 			if (nm.Length == 3) nm = nm.Substring(0,2) + '0' + nm.Substring(2,1);
 				g.name = nm;
 				pos.x += 3 * RADIUS;
-				hex[i,j] = new Hex(i, j, pos.y, g, new Biome(BiomeType.empty));
+				hex[i,j] = new Hex(i, j, pos.y, g, BiomeType.empty);
 			}
 		}
 
 		HeightsGeneration();
+
+		foreach (Hex h in hex) {
+			if (h.h > AVERAGE_DEPTH_NOMINAL && h.h < MAX_HEIGHT / 2) { //acceptable height for city
+				if (Random.value > 0.9f) {
+					h.biomeType = BiomeType.city;
+					h.BiomeStructuresGeneration();
+				}
+			}
+		}
 	}
 
-	void HeightsGeneration() {
+	void HeightsGeneration() { //CURRENT
 		int step = 0, dirMain = 5, dirUpto = 1, dirUndo = 3, yCount = hex.GetLength(1) * 2;
 		Hex mainHex = hex[0,0], underHex, ontoHex;
 		float gpart = 0.3f;
@@ -158,7 +170,7 @@ public class LevelDesigner : MonoBehaviour {
 			mainHex.h = h;
 			mainHex.ApplyHeight();
 
-				float dh = h, gpart2 = gpart;
+			float dh = h;
 				underHex = GetNeighbourCell(mainHex, dirUndo);
 			while (underHex != null) {
 					float delta = maxGap * (gpart + (1 - gpart) * Random.value);
@@ -235,7 +247,6 @@ public class LevelDesigner : MonoBehaviour {
 		int specialPoint4_x = (int)(Random.value * a + a);
 		int specialPoint4_y = (int)(Random.value * b + b);
 
-		int x,y;
 		Hex peak;
 		Hex[] deep = new Hex[3];
 		if (Random.value > 0.5f) {

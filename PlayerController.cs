@@ -32,7 +32,7 @@ public class PlayerController : MonoBehaviour {
 
 	public Light projector1, projector2;
 
-	int modulesCount = 6, modulesCapacity = 32;
+	int modulesCount = 6;
 	bool showInventory = false;
 	int sh,sw;
 
@@ -40,7 +40,6 @@ public class PlayerController : MonoBehaviour {
 	public float draft = 4, length = 1, width = 8; //осадка, длина, ширина
 
 	Vector3 moveVector;
-	float savedSpeed = 0;
 	public float yForce = 0, realForce = 0, forceChangingSpeed = 10;
 	float flyTime = 0;
 	public float ballastCompression = 10;
@@ -49,8 +48,9 @@ public class PlayerController : MonoBehaviour {
 	public Vector3 seaCorrectionVector = new Vector3(-500,0,-500);
 	float forceTimer = 0;
 
-	static PlayerController player;
+	public float shortRangeScanner = 300, shortScannerCost = 10;
 
+	public static PlayerController player;
 
 	void Awake() {
 		//singleton pattern
@@ -81,6 +81,8 @@ public class PlayerController : MonoBehaviour {
 		modules[0].AddItem(Item.item_electronic);
 		modules[0].AddItem(Item.item_plastic);
 		modules[0].AddItem(Item.item_people);
+
+		gameObject.AddComponent<UI>();
 	}
 
 	void Update () {
@@ -94,11 +96,6 @@ public class PlayerController : MonoBehaviour {
 		moveVector =Vector3.zero;
 		int directionVectorsCount = 0;
 
-		RaycastHit waterRaycaster;
-		float surfaceDist = 0;
-		var waterLayerMask = 1<<4 ; //water layer
-		if (Physics.Raycast (transform.position + Vector3.up * 1000,Vector3.down, out waterRaycaster, Mathf.Infinity, waterLayerMask )) surfaceDist = transform.position.y - waterRaycaster.point.y;
-
 		if (Input.GetKeyDown("p")) {projector1.enabled = !projector1.enabled;projector2.enabled = projector1.enabled;}
 		if (Input.GetKeyDown("i")) {
 			showInventory = !showInventory;
@@ -109,6 +106,9 @@ public class PlayerController : MonoBehaviour {
 
 		float t = Time.deltaTime;
 		height = transform.position.y;
+		RaycastHit waterRaycaster;
+		var waterLayerMask = 1<<4 ; //water layer
+		Physics.Raycast (transform.position + Vector3.up * 1000,Vector3.down, out waterRaycaster, Mathf.Infinity, waterLayerMask );
 		waterlevel = waterRaycaster.point.y;
 		//наклон
 		float a = Vector3.Angle (transform.forward, Vector3.up);
@@ -257,7 +257,7 @@ public class PlayerController : MonoBehaviour {
 				float surface_cf = 1;
 				if (waterlevel - transform.position.y < draft) surface_cf = GameMaster.seaStrength;
 				yForce = pressure * NATURAL_GRAVITY * volume *surface_cf   - (mass + ballastMass * ballastCompression) * NATURAL_GRAVITY;
-
+				if (yForce < 0) yForce += yForce * 10 * Mathf.Abs((Mathf.Pow((1 - Vector3.Angle(transform.forward, Vector3.down) / 90.0f), 3)));
 			}
 			else {
 				yForce = -(mass + ballastMass * ballastCompression) * NATURAL_GRAVITY * (1 +flyTime);
@@ -347,14 +347,22 @@ public class PlayerController : MonoBehaviour {
 		if (index < 0 || index > modules.Length) return null;
 		return modules[index];
 	}
+
+	public bool LoadItemFromDrone (Item i) {
+		foreach (Module m in modules) {
+			if (m.AddItem(i) == true) return true;
+		}
+		return false;
+	}
+
+	public bool ConsumeEnergy (float f) {if (energy - f >= 0) {energy-= f; return true;} else return false;}
 		
 
 	void OnGUI () {
-		if (false) {
 		GUILayout.Label((Mathf.Floor(speed * 100) / 100).ToString());
 		GUILayout.Label(bottomDistance.ToString()+ "u");
-		GUILayout.Label(GameMaster.cursorPosition.ToString());
-		}
+		GUILayout.Label("Рабочая глубина: "+ physicDepth.ToString()+"u");
+		GUILayout.Label("Текущая глубина: "+ height.ToString()+"u");
 
 		if (!mainSkinSet) {GUI.skin.font = mainSkin.font;}
 		int k = GameMaster.GetGUIPiece();

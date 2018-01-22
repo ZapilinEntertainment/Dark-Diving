@@ -28,6 +28,7 @@
           float2 uv_MainTex;
           float2 uv_BumpMap;
           float3 worldPos;
+          float3 viewDir;
       };
 
 		half _Glossiness;
@@ -55,10 +56,12 @@
 			o.Albedo = c.rgb;
 			o.Normal = UnpackNormal(tex2D(_BumpMap, IN.uv_BumpMap));
 			// Metallic and smoothness come from slider variables
+			 half rim = 1.0 - saturate(dot (normalize(IN.viewDir), o.Normal));
+			 fixed4 rimColor = (1,1,1,1);
+			  o.Emission = tex2D (_EmissionMap, IN.uv_MainTex) * (1 + depth * 3);
 			o.Metallic = _Metallic;
 			o.Smoothness = _Glossiness;
 			o.Alpha = c.a;
-			o.Emission = tex2D (_EmissionMap, IN.uv_MainTex) * (1 + depth * 3);
 		}
 		ENDCG
 	}

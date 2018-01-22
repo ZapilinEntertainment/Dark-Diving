@@ -2,16 +2,16 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public enum BiomeType {empty, hills};
+public enum BiomeType {empty, hills, city};
 
 public class Biome {
 	
 
 	public BiomeType type;
 
-	public Biome () {type = BiomeType.empty;}
+	Biome () {type = BiomeType.empty;}
 
-	public Biome (BiomeType biomeType) {
+	Biome (BiomeType biomeType) {
 		type = biomeType;
 	}
 }

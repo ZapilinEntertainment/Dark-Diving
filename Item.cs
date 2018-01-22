@@ -7,22 +7,23 @@ public enum ItemType {Empty, Material, Human}
 public class Item {
 	public string f_name, f_description;
 	public int f_count = 1, f_maxCount = 1;
+	public int itemId = -1; // -1 is unidentified, -2 is custom item
 	public Texture item_tx;
 	public float f_drownChance = 0;
 	public ItemType type = ItemType.Empty;
 	public static readonly Item item_metal, item_dragmetal, item_plastic, item_chemicals, item_electronic, item_people;
 
 	static Item () {
-		item_metal = new Item ("Metal", "Metallic parts available for recycling.", ItemType.Material, 1, 1, PoolMaster.mainPool.item_metal_tx, 0);
-		item_dragmetal = new Item ("Rare metals", "Different metals using for making alloys and composites.", ItemType.Material, 1,1, PoolMaster.mainPool.item_dragmetal_tx, 0.01f);
-		item_plastic = new Item ("Plastic", "Plastic mass available for recycling", ItemType.Material, 1,1, PoolMaster.mainPool.item_plastic_tx, 0.05f);
-		item_chemicals = new Item ("Chemicals", "Different chemical substances for making explosives and more", ItemType.Material,1,1, PoolMaster.mainPool.item_chemicals_tx, 0.9f);
-		item_electronic = new Item ("Electronics", "Inner compound of high-technology devices", ItemType.Material,1,1, PoolMaster.mainPool.item_electronic_tx, 0.5f);
-		item_people = new Item ("People", "Survivors. Poor things.", ItemType.Human, 1, 10, PoolMaster.mainPool.item_person_tx, 0.99f);
+		item_metal = new Item ("Metal", "Metallic parts available for recycling.", ItemType.Material,1, 1, 1, PoolMaster.mainPool.item_metal_tx, 0);
+		item_dragmetal = new Item ("Rare metals", "Different metals using for making alloys and composites.", ItemType.Material,2, 1,1, PoolMaster.mainPool.item_dragmetal_tx, 0.01f);
+		item_plastic = new Item ("Plastic", "Plastic mass available for recycling", ItemType.Material,3, 1,1, PoolMaster.mainPool.item_plastic_tx, 0.05f);
+		item_chemicals = new Item ("Chemicals", "Different chemical substances for making explosives and more", ItemType.Material,4,1,1, PoolMaster.mainPool.item_chemicals_tx, 0.9f);
+		item_electronic = new Item ("Electronics", "Inner compound of high-technology devices", ItemType.Material,5,1,1, PoolMaster.mainPool.item_electronic_tx, 0.5f);
+		item_people = new Item ("People", "Survivors. Poor things.", ItemType.Human,6, 1, 10, PoolMaster.mainPool.item_person_tx, 0.99f);
 	}
 
 	public void Flooding () {
-		if (Random.value < f_drownChance) type = ItemType.Empty;
+		if (Random.value < f_drownChance) {type = ItemType.Empty;itemId = -1;}
 	}
 
 	public Item() {
@@ -32,10 +33,11 @@ public class Item {
 		f_maxCount = 1;
 		f_drownChance = 0;
 		type = ItemType.Empty;
+		itemId = -1;
 		item_tx = PoolMaster.mainPool.item_default_tx;
 	}
 
-	public Item (string name, string desc, ItemType itemType, int count, int maxCount,Texture icon, float chanceToBeDrown ) {
+	public Item (string name, string desc, ItemType itemType, int itemID, int count, int maxCount,Texture icon, float chanceToBeDrown ) {
 		f_name = name;
 		f_description = desc;
 		if (count < 0) f_count = 0;		f_count = count;
@@ -44,6 +46,7 @@ public class Item {
 		if (chanceToBeDrown < 0) chanceToBeDrown = 0; else	chanceToBeDrown = Mathf.Repeat(chanceToBeDrown,1);
 		f_drownChance = chanceToBeDrown;
 		type = itemType;
+		itemId = itemID;
 	}
 
 	public Item Clone () {
@@ -54,6 +57,19 @@ public class Item {
 		item2.f_maxCount = f_maxCount;
 		item2.type = type;
 		item2.item_tx = item_tx;
+		item2.itemId = itemId;
 		return(item2);
+	}
+
+	public static Item GetItemById(int id) {
+		switch (id) {
+		case 1: return item_metal.Clone();break;
+		case 2: return item_dragmetal.Clone();break;
+		case 3: return item_plastic.Clone();break;
+		case 4: return item_chemicals.Clone();break;
+		case 5: return item_electronic.Clone();break;
+		case 6: return item_people.Clone();break;
+		default: return null; break;
+		}
 	}
 }

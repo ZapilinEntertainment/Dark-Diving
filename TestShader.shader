@@ -49,13 +49,15 @@
 			fixed4 frag (v2f i) : SV_Target
 			{
 				fixed4 col = tex2D(_MainTex, i.uv);
+
 				col.r *= (1 - _DeepPercent); 
-				col.g *= 0.5 + (1 - _DeepPercent)/2;
-				col.b *= 0.5 + (1 - _DeepPercent)/2;
+				col.g *= 0.5 + (1 - _DeepPercent) * 0.5;
+				col.b *= 0.5 + (1 - _DeepPercent) * 0.5;
 				if (_DeepPercent > 0) {
 					col.r = 1 - (1 - col.r)*(1-_MyColor.r);
 				    col.g = 1 - (1 - col.g)*(1-_MyColor.g);
 				    col.b = 1 - (1 - col.b)*(1-_MyColor.b);
+
 
 				    //float time = _Time[1];
 				    //float2 waterDisplacement = (0, sin(time)/100.0);				

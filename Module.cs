@@ -115,7 +115,6 @@ public class Module : MonoBehaviour {
 		int sw = Screen.width;
 		if (GameMaster.isPaused()) return;
 		if (f_type != ModuleType.Empty && moduleTexture!= null) GUI.DrawTexture(iconRect, moduleTexture,ScaleMode.StretchToFill);
-		if (storageRect == null) return;
 		if (showOnGUI) {
 			int realPosX = (int) storageRect.x; if (f_type != ModuleType.Empty) realPosX += (int)(storageRect.width)/2;
 			GUI.DrawTexture(storageRect, PoolMaster.mainPool.Inventory16cells_tx,ScaleMode.StretchToFill);

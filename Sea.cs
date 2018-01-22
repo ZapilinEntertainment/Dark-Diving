@@ -17,11 +17,12 @@ public class Sea : MonoBehaviour {
 	MeshFilter mf ;
 	MeshCollider mc;
 
-	public float waterUpdateTime = 0.3f, waveSpeed = 1, waveScale = 1, waveDistance = 10, 
+	public float waterUpdateTime = 0.3f, waveSpeed = 1, waveScale = 1, waveCount = 10, 
 	noiseStrength = 0.1f, noiseWalk = 0.1f;
 	public float waterUpdateTimer = 0, t = 0, t2 = 0;
 	Vector3 correctionVector, prevPos;
 	MeshFilter[] additionalSquares;
+	public float seaStrength = 1;
 
 	void Awake () {
 		mf = gameObject.AddComponent<MeshFilter>();
@@ -60,12 +61,14 @@ public class Sea : MonoBehaviour {
 			case 7: g.transform.localPosition = new Vector3(1, 0, -1) * squareWidth; break;
 			}
 			g.transform.Translate(Vector3.down * 0.1f);
+			g.SetActive(false);
 		}
 
 		GenerateWave();
 	}
 
 	void Update() {
+		GameMaster.seaStrength = seaStrength;
 		if (GameMaster.isPaused()) return;
 		t += Time.deltaTime * waveSpeed;
 		if (t > 1) t= Mathf.Repeat(0,1);
@@ -80,35 +83,20 @@ public class Sea : MonoBehaviour {
 	void GenerateWave() {
 		Vector3[] nv = mf.mesh.vertices;
 		Vector3 deltaPos = prevPos - transform.position;
-		t -= deltaPos.x / squareWidth;
 		prevPos = transform.position;
+		Vector3 movementCorrection = deltaPos / squareWidth;
 		float p = 0;
 		for (int i = 0; i <innerSquareResolution; i++) {
 			for (int j = 0; j < innerSquareResolution; j++)
 			{
-				p = j; p /= innerSquareResolution;
-				nv[ i * innerSquareResolution + j].y = Mathf.Sin((t+p  ) * squareWidth / waveDistance  *Mathf.PI * 2) * waveScale;
-				nv[ i * innerSquareResolution + j].y += Mathf.PerlinNoise(nv[ i * innerSquareResolution + j].x + noiseWalk, nv[ i * innerSquareResolution + j].y + Mathf.Sin(t * 0.2f * Mathf.PI)) * noiseStrength;
+				p = j; p /= innerSquareResolution; 
+				nv[ i * innerSquareResolution + j].y = Mathf.Sin((t+p) * waveCount*Mathf.PI * 2) * waveScale;
+				//nv[ i * innerSquareResolution + j].y += Mathf.PerlinNoise(nv[ i * innerSquareResolution + j].x +movementCorrection.z + noiseWalk, nv[ i * innerSquareResolution + j].y + Mathf.Sin((t+movementCorrection.x) * 0.2f * Mathf.PI) + movementCorrection.z) * noiseStrength;
 			}
 		}
 		mf.mesh.vertices = nv;
 		mf.mesh.RecalculateNormals();
 		mc.sharedMesh = mf.mesh;
-
-		foreach (MeshFilter f in additionalSquares) {
-			Vector3[] av = f.mesh.vertices;
-			float p2 = 0;
-			for (int i = 0; i <outerSquareResolution; i++) {
-				for (int j = 0; j < outerSquareResolution; j++)
-				{
-					p2 = j; p2 /= outerSquareResolution;
-					av[ i * outerSquareResolution + j].y = Mathf.Sin((t+p2  ) * squareWidth / waveDistance  *Mathf.PI * 2) * waveScale;
-					av[ i * outerSquareResolution + j].y += Mathf.PerlinNoise(av[ i * outerSquareResolution + j].x + noiseWalk, av[ i * outerSquareResolution + j].y + Mathf.Sin(t * 0.2f * Mathf.PI)) * noiseStrength;
-				}
-			}
-			f.mesh.vertices = av;
-			f.mesh.RecalculateNormals();
-		}
 
 		waterUpdateTimer = waterUpdateTime;
 	}
@@ -122,7 +110,7 @@ public class Sea : MonoBehaviour {
 		t = Mathf.Repeat(0,1);
 		float waveType = position.z;
 
-		position.y = Mathf.Sin((t * waveSpeed * squareWidth / waveDistance + waveType)* Mathf.PI * 2) * waveScale;
+		position.y = Mathf.Sin((t * waveSpeed * waveCount + waveType)* Mathf.PI * 2) * waveScale;
 
 		//Add noise to make it more realistic
 		position.y += Mathf.PerlinNoise(position.x + noiseWalk, position.y + Mathf.Sin(t * 0.2f * Mathf.PI)) * noiseStrength;

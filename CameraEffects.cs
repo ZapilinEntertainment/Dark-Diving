@@ -11,12 +11,10 @@ public class CameraEffects : MonoBehaviour {
 	public Light dayLight;
 	public Color normalSeaColor, mySeaColor;
 	public Material skyboxMaterial, bottomMaterial;
-	Camera cam;
 	float surfaceHeight;
 
 
 	void Awake () {
-		cam = gameObject.GetComponent<Camera>();
 		surfaceHeight = 0;
 	}
 
