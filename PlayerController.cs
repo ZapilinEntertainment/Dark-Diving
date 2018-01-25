@@ -50,6 +50,13 @@ public class PlayerController : MonoBehaviour {
 
 	public float shortRangeScanner = 300, shortScannerCost = 10;
 
+	public CargoDrone[] transportDrones;
+	public Vector3 droneHangarPos = new Vector3(0,0, - 15);
+	List <ResourcesBox> plannedLootPoints;
+
+	public Transform leftFin, rightFin,fin;
+	bool speedBlocked = false;
+
 	public static PlayerController player;
 
 	void Awake() {
@@ -81,6 +88,16 @@ public class PlayerController : MonoBehaviour {
 		modules[0].AddItem(Item.item_electronic);
 		modules[0].AddItem(Item.item_plastic);
 		modules[0].AddItem(Item.item_people);
+
+		transportDrones = new CargoDrone[6];
+		GameObject dronePref = Resources.Load<GameObject>("cargoDrone_pref");
+		for (int i =0; i< 6; i++) {
+			transportDrones[i] = GameObject.Instantiate(dronePref, droneHangarPos, transform.rotation).GetComponent<CargoDrone>();
+			transportDrones[i].depot = this;
+			transportDrones[i].name = "cargoDrone"+i.ToString();
+			transportDrones[i].gameObject.SetActive(false);
+		}
+		plannedLootPoints = new List<ResourcesBox>();
 
 		gameObject.AddComponent<UI>();
 	}
@@ -121,14 +138,8 @@ public class PlayerController : MonoBehaviour {
 		if (height <= waterlevel+draft) {  // Зона, где возможно управление кораблем -поверхность и под водой
 			flyTime = 0;
 			if (energy > 0) {
-				float sinkStep = SINK_SPEED * sinkSmooth * t;
 				if (Input.GetKey("q")) { 
 					sinkSmooth += SINKING_SMOOTH_CF * t; 
-					if (sinkSmooth > 1) sinkSmooth = 1;
-					if (ballastMass < maxBallastMass) {
-						ballastMass += pumpInSpeed * pressure * Time.deltaTime;
-						energy -= pumpConsumption * t;
-					}
 
 					if (Input.GetKey ("e")) {
 						if (ballastMass < maxBallastMass) {
@@ -139,32 +150,38 @@ public class PlayerController : MonoBehaviour {
 					}
 				}
 				else {
-					if (Input.GetKey ("e")) {
-						sinkSmooth -= SINKING_SMOOTH_CF * t; 
-						if (sinkSmooth < -1) sinkSmooth = -1;
-						if (ballastMass > 0) {
-							ballastMass -= pumpOutSpeed / pressure;
-							energy -= pumpConsumption * t;
-						}
-					}
+					if (Input.GetKey ("e")) 	sinkSmooth -= SINKING_SMOOTH_CF * t; 
 					else {	if (transform.localRotation.x != 0) Differenting( t ); }
 				}
 				if (ballastMass > maxBallastMass) ballastMass = maxBallastMass;
 				else if (ballastMass < 0) ballastMass = 0;
 
-				if (a > 179 && sinkSmooth > 0) sinkSmooth=0;
-				else { if (a < 45 && sinkSmooth < 0) sinkSmooth = 0;}
-				if (sinkSmooth != 0) transform.Rotate (Vector3.right * sinkStep, Space.Self);
-
 
 			//Движение и поворот
-			if (Input.GetKey( "w")) {if (speed + acceleration * t < maxSpeed) speed += acceleration * t;}
+				if (!speedBlocked) {
+					if (Input.GetKey( "w")) {
+							if (speed + acceleration * t < maxSpeed) {
+								bool prevSpeedWasNegative = speed < 0;
+								speed += acceleration * t;
+							if (speed > 0 && prevSpeedWasNegative) {speed = 0;speedBlocked = true;}
+							}
+						}
+						else {
+							if (Input.GetKey( "s") ) {
+								if (speed - acceleration * t > -10) {
+									bool prevSpeedWasPositive = speed > 0;
+									speed -= acceleration * t;
+								if (speed < 0 && prevSpeedWasPositive) {speed = 0; speedBlocked = true;}
+								}
+							}
+							else {
+								//if (!speedIsFixed) speed = Mathf.SmoothDamp(speed, 0, ref speed, speed/acceleration);
+							}
+						}	
+				}
 				else {
-					if (Input.GetKey( "s") ) {if (speed - acceleration * t > -10) speed -= acceleration * t;}
-					else {
-						//if (!speedIsFixed) speed = Mathf.SmoothDamp(speed, 0, ref speed, speed/acceleration);
-					}
-				}	
+					if (Input.GetKeyUp ("w") || Input.GetKeyUp("s")) speedBlocked = false;
+				}
 
 			if (Input.GetKey ("d")) {
 					if (rotationSmooth < 1) {
@@ -180,7 +197,7 @@ public class PlayerController : MonoBehaviour {
 				else rotationSmooth = Mathf.SmoothDamp(rotationSmooth, 0,  ref rotationSmooth, t * 3);
 			}
 			if (rotationSmooth != 0) transform.Rotate (Vector3.up * rotationSmooth * t * rotationSpeed * speed / maxSpeed, Space.World);
-
+				fin.localRotation = Quaternion.Euler(Vector3.down * rotationSmooth * 30);
 				//STABILIZE  Z-AXIS
 				float trz = transform.localRotation.eulerAngles.z;
 				if (trz!= 0) {
@@ -190,13 +207,6 @@ public class PlayerController : MonoBehaviour {
 						Vector3 nrot = transform.rotation.eulerAngles;
 						nrot.z = 0;
 						transform.rotation = Quaternion.Euler(nrot);
-					}
-				}
-
-				if (Input.GetKey(KeyCode.Space)) {
-					if (energy > 0 && ballastMass > 0) {
-						ballastMass -= 2 * pumpOutSpeed * Time.deltaTime;
-						energy -= 2 * pumpConsumption * Time.deltaTime;
 					}
 				}
 			}
@@ -226,12 +236,10 @@ public class PlayerController : MonoBehaviour {
 		
 				if ((waterlevel_fwd - fwd_point.y) < 0 && (waterlevel_aft - aft_point.y) > 0) {
 					sinkSmooth += SINKING_SMOOTH_CF * t * k *k * 2; 
-					if (sinkSmooth > 1) sinkSmooth = 1;
 				}
 				else {
 					if ((waterlevel_fwd - fwd_point.y) > 0 && (waterlevel_aft - aft_point.y) < 0) {
 						sinkSmooth -= SINKING_SMOOTH_CF * t * k *k * 2; 
-						if (sinkSmooth < -1) sinkSmooth = -1;
 					}
 				}
 
@@ -239,11 +247,15 @@ public class PlayerController : MonoBehaviour {
 		}
 		else { 
 			flyTime += t; pressure = 0;
-			if (Input.GetKey ("e") && energy > 0) {
-				if (ballastMass > 0) {
-					ballastMass -= pumpOutSpeed * t;
-					energy -= pumpConsumption * t;
-				}
+			sinkSmooth += SINKING_SMOOTH_CF * t; 
+		}
+
+		if (Input.GetKey(KeyCode.Space)) {
+			float k = 1, k2 = 1;
+			if (height > waterlevel ) {if (height - waterlevel > draft) {k = 100; k2 = 0;} else k = 10;}
+			if (energy > 0 && ballastMass > 0) {
+				ballastMass -= 2 * pumpOutSpeed * k* Time.deltaTime;
+				energy -= 2 * pumpConsumption * k2 * Time.deltaTime;
 			}
 		}
 
@@ -255,8 +267,11 @@ public class PlayerController : MonoBehaviour {
 				float k = ( 1 - transform.position.y - (waterlevel - draft)) / (2 * draft);
 				if (k < 0) k *= (-1);
 				float surface_cf = 1;
-				if (waterlevel - transform.position.y < draft) surface_cf = GameMaster.seaStrength;
-				yForce = pressure * NATURAL_GRAVITY * volume *surface_cf   - (mass + ballastMass * ballastCompression) * NATURAL_GRAVITY;
+				if (waterlevel - transform.position.y < draft) {
+					surface_cf = GameMaster.seaStrength;
+				}
+				yForce = pressure * volume *surface_cf   - (mass + ballastMass * ballastCompression);
+				yForce *= NATURAL_GRAVITY;
 				if (yForce < 0) yForce += yForce * 10 * Mathf.Abs((Mathf.Pow((1 - Vector3.Angle(transform.forward, Vector3.down) / 90.0f), 3)));
 			}
 			else {
@@ -280,14 +295,18 @@ public class PlayerController : MonoBehaviour {
 			if (transform.position.y  - waterlevel > draft) {
 				realForce -= (forceChangingSpeed+ NATURAL_GRAVITY *flyTime*mass * 0.5f) * Time.deltaTime; 
 				sinkSmooth += SINKING_SMOOTH_CF * t; 
-				if (sinkSmooth > 1) sinkSmooth = 1;
 			}
 			else realForce -= forceChangingSpeed * Time.deltaTime; 
 			if (realForce < yForce) realForce = yForce;}
 
 			transform.Translate (Vector3.up * realForce * Time.deltaTime,Space.World);
-
-
+		if (sinkSmooth > 1) sinkSmooth = 1;
+		else if (sinkSmooth < -1) sinkSmooth = -1;
+			if (a > 179 && sinkSmooth > 0) sinkSmooth=0;
+			else { if (a < 45 && sinkSmooth < 0) sinkSmooth = 0;}
+			if (sinkSmooth != 0) transform.Rotate (Vector3.right * sinkSmooth *SINK_SPEED * t, Space.Self);
+		leftFin.localRotation = Quaternion.Euler(Vector3.back* sinkSmooth* 30);
+		rightFin.localRotation = Quaternion.Euler(Vector3.forward* sinkSmooth * 30);
 			
 		height = transform.position.y;
 
@@ -356,6 +375,69 @@ public class PlayerController : MonoBehaviour {
 	}
 
 	public bool ConsumeEnergy (float f) {if (energy - f >= 0) {energy-= f; return true;} else return false;}
+
+	public void AddLootPoint (ResourcesBox source) {
+		if (source == null || source.extractionBitmask == 0 || transportDrones.Length == 0) return;
+		if (plannedLootPoints.Count > 0) { foreach (ResourcesBox rb in plannedLootPoints) {if (rb == source) return;}}
+		plannedLootPoints.Add(source);
+		if (source.workingDrones > 0 ) {
+		int activeDronesCount = 0;
+		foreach (CargoDrone c in transportDrones) {if (c.gameObject.activeSelf) activeDronesCount++;}
+			if (activeDronesCount < transportDrones.Length){
+				int newActiveDronesCount = activeDronesCount + source.workingDrones;
+				if (newActiveDronesCount > transportDrones.Length) {
+					newActiveDronesCount = transportDrones.Length;
+					foreach (CargoDrone c in transportDrones) {
+						if ( !c.gameObject.activeSelf ) {
+							c.transform.position = transform.TransformPoint(droneHangarPos);
+							c.gameObject.SetActive(true); 
+							c.timer = 0;
+							c.target = plannedLootPoints[plannedLootPoints.Count-1];
+						}
+					}
+				}
+				else {
+					activeDronesCount = source.workingDrones;
+					foreach( CargoDrone c in transportDrones) {
+						if ( !c.gameObject.activeSelf ) { 
+							c.transform.position = transform.TransformPoint(droneHangarPos);
+							c.gameObject.SetActive(true);
+							c.timer = 0;activeDronesCount --;
+							c.target = plannedLootPoints[plannedLootPoints.Count-1];
+							if (activeDronesCount == 0) break;}
+						}
+				}
+			}
+			}
+	}
+	public ResourcesBox GetLootPoint () {
+		if (plannedLootPoints == null || plannedLootPoints.Count == 0 ) return null;
+		ResourcesBox answer = null;
+		print (plannedLootPoints.Count);
+		for (int i =0; i< plannedLootPoints.Count;i++) {
+			if (plannedLootPoints[i].BitmasksConjuction() == 0) plannedLootPoints.RemoveAt(i);
+			else {answer = plannedLootPoints[i]; break;}
+		}
+		return answer;
+	}
+
+	public void SendDroneToResBox (ResourcesBox rbox) {
+		if (rbox == null) return;
+		CargoDrone drone = null;
+		foreach (CargoDrone c in transportDrones) {
+			if (c.gameObject.activeSelf ==false || c.target == null) {
+				drone = c; break;
+			}
+		}
+		if ( drone == null) {drone = transportDrones[(int)Random.value * (transportDrones.Length - 1)];}
+		if (drone != null) {
+			drone.target = rbox;
+			if (!drone.gameObject.activeSelf) {
+				drone.transform.position = transform.TransformPoint(droneHangarPos); 
+				drone.gameObject.SetActive(true);}
+			drone.changeDestinationAfterHaul = true;
+		}
+	}
 		
 
 	void OnGUI () {

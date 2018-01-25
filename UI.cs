@@ -9,6 +9,7 @@ public class UI : MonoBehaviour {
 	Vector2 mousePos;
 	static UI playerUI;
 	GUISkin submarineGUISkin;
+	bool updateResBoxData = false;
 
 	void Awake () {
 		if (playerUI != null) Destroy(playerUI);
@@ -32,6 +33,7 @@ public class UI : MonoBehaviour {
 			if (Physics.Raycast(r, out rh, PlayerController.player.shortRangeScanner,waterLayerMask)) {
 				GameObject target = rh.collider.transform.root.gameObject;
 				chosenResBox = target.GetComponent<ResourcesBox>();
+				if (chosenResBox != null) updateResBoxData = true;
 			} 
 		}
 	}
@@ -49,11 +51,14 @@ public class UI : MonoBehaviour {
 					if (PlayerController.player.ConsumeEnergy(PlayerController.player.shortScannerCost)) {
 						chosenResBox.scanned = true;
 						resBoxContentTypes = chosenResBox.GetAvailableResourcesList(false);
-						print (resBoxContentTypes.Count);
 					}
 				}				
 			}
 			else { // уже просканирован
+				if (updateResBoxData) {
+					resBoxContentTypes = chosenResBox.GetAvailableResourcesList(false);
+					updateResBoxData = false;
+				}
 				int n = resBoxContentTypes.Count;
 				if (n > 0) {
 					
@@ -62,12 +67,44 @@ public class UI : MonoBehaviour {
 					else box_r= new Rect(rbox_pos.x -2 * k, sh - rbox_pos.y - k, 4 * k, 1.5f*k);
 					GUI.Box(box_r, GUIContent.none);
 					Rect info_r = new Rect(box_r.x, box_r.y, k,k);
-					for (int i = 0; i < n; i++) {
-						GUI.DrawTexture(info_r,resBoxContentTypes[i].item_tx, ScaleMode.StretchToFill);
-						info_r.x += k;
+					if (!chosenResBox.explored) {
+						for (int i = 0; i < n; i++) {
+							bool alreadyChosen = false;
+							if ((chosenResBox.extractionBitmask & ((int)Mathf.Pow(2,resBoxContentTypes[i].itemId))) != 0) {GUI.DrawTexture(info_r,PoolMaster.mainPool.choosingFrame_tx, ScaleMode.StretchToFill);alreadyChosen = true;}
+							if (GUI.Button(info_r,resBoxContentTypes[i].item_tx)) {
+								if (alreadyChosen) chosenResBox.extractionBitmask -= (int)Mathf.Pow(2,resBoxContentTypes[i].itemId);
+								else chosenResBox.extractionBitmask += (int)Mathf.Pow(2,resBoxContentTypes[i].itemId);
+								}
+							info_r.x += k;
+						}
 					}
-					if (GUI.Button(new Rect(box_r.x + box_r.width - 4 *k, box_r.y + k, 2 *k, k/2), "Send drone")) {}
-					if (GUI.Button(new Rect(box_r.x + box_r.width - 2 *k, box_r.y + k, 2*k, k/2), "Loot all")) {}
+					else {
+						for (int i = 0; i < n; i++) {
+							bool alreadyChosen = false;
+							int iid = resBoxContentTypes[i].itemId;
+							if ((chosenResBox.extractionBitmask & ((int)Mathf.Pow(2,iid))) != 0) {GUI.DrawTexture(info_r,PoolMaster.mainPool.choosingFrame_tx, ScaleMode.StretchToFill);alreadyChosen = true;}
+							if (GUI.Button(info_r,resBoxContentTypes[i].item_tx)) {
+								if (alreadyChosen) chosenResBox.extractionBitmask -= (int)Mathf.Pow(2,iid);
+								else chosenResBox.extractionBitmask += (int)Mathf.Pow(2,iid);
+							}
+							GUI.Label(new Rect(info_r.x, info_r.y, info_r.width/2, info_r.height/2), chosenResBox.counts[iid].ToString());
+							info_r.x += k;
+						}
+					}
+					if (GUI.Button(new Rect(box_r.x + box_r.width - 4 *k, box_r.y + k, 2 *k, k/2), "Send drone")) {
+						chosenResBox.lootUntilExhausted = false;
+						PlayerController.player.SendDroneToResBox(chosenResBox);
+					}
+					if (GUI.Button(new Rect(box_r.x + box_r.width - 2 *k, box_r.y + k, 2*k, k/2), "Loot all")) {
+						chosenResBox.extractionBitmask = chosenResBox.GetContentBitmask();
+						PlayerController.player.AddLootPoint(chosenResBox);
+						chosenResBox.lootUntilExhausted = true;
+					}
+					if (GUI.Button(new Rect(box_r.x + box_r.width, box_r.y, k/2, k/2), "+")) {
+						if (chosenResBox.workingDrones < PlayerController.player.transportDrones.Length) chosenResBox.workingDrones++;}
+					if (GUI.Button(new Rect(box_r.x + box_r.width, box_r.y + k, k/2, k/2), "-")) {
+						if (chosenResBox.workingDrones > 0) chosenResBox.workingDrones--;}
+					GUI.Label(new Rect(box_r.x + box_r.width, box_r.y + k/2, 2 *k, k/2), chosenResBox.workingDrones.ToString() + " drones");
 				}
 			}
 		}

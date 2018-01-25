@@ -15,6 +15,8 @@ public class PoolMaster : MonoBehaviour {
 	public static PoolMaster mainPool;
 	public GameObject city_housing_pref, city_mall_pref, city_offices_pref, city_industrial_pref;
 
+	public Texture choosingFrame_tx;
+
 	void Awake () {
 		//singleton pattern
 		if (mainPool != null)  Component.Destroy(mainPool);
@@ -39,6 +41,8 @@ public class PoolMaster : MonoBehaviour {
 		wave_tx.SetPixels(pixels);
 		wave_tx.Apply();
 		waterMaterial.SetTexture("_NoiseTex", wave_tx);
+
+		choosingFrame_tx = Resources.Load<Texture>("Textures/GUI/choosingFrame_tx");
 	}
 
 	public void Watersplash2At (Vector3 pos) {

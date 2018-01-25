@@ -5,6 +5,7 @@
 		_BumpMap ("Bump map", 2D) = "grey" {}
 		_Bumpness ("Bump strength", Range(0,5)) = 1
 		_EmissionMap("Light map", 2D) = "black" {}
+		_EmissionPower ("Emission power", float ) = 1
 		_Glossiness ("Smoothness", Range(0,1)) = 0.5
 		_Metallic ("Metallic", Range(0,1)) = 0.0
 		_LightLimit("LightlessDepth", float) = -2000
@@ -34,8 +35,7 @@
 		half _Glossiness;
 		half _Metallic;
 		fixed4 _Color;
-		float _LightLimit;
-		float _Bumpness;
+		float _LightLimit,_Bumpness, _EmissionPower;
 
 		// Add instancing support for this shader. You need to check 'Enable Instancing' on materials that use the shader.
 		// See https://docs.unity3d.com/Manual/GPUInstancing.html for more information about instancing.
@@ -58,7 +58,7 @@
 			// Metallic and smoothness come from slider variables
 			 half rim = 1.0 - saturate(dot (normalize(IN.viewDir), o.Normal));
 			 fixed4 rimColor = (1,1,1,1);
-			  o.Emission = tex2D (_EmissionMap, IN.uv_MainTex) * (1 + depth * 3);
+			  o.Emission = tex2D (_EmissionMap, IN.uv_MainTex) * (_EmissionPower + depth * 3) ;
 			o.Metallic = _Metallic;
 			o.Smoothness = _Glossiness;
 			o.Alpha = c.a;
