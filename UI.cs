@@ -7,9 +7,16 @@ public class UI : MonoBehaviour {
 	int sw = 512,sh = 512;
 	ResourcesBox chosenResBox; List<Item> resBoxContentTypes;
 	Vector2 mousePos;
-	static UI playerUI;
+	public static UI playerUI;
 	GUISkin submarineGUISkin;
 	bool updateResBoxData = false;
+	public Transform UI_camera;
+
+	GameObject[] mapCells;
+	bool mapIsActive = false;
+	GameObject shipMarker;
+	const int UI_RENDER_LAYER = 5;
+	float distanceCoefficient = 0.1f;
 
 	void Awake () {
 		if (playerUI != null) Destroy(playerUI);
@@ -19,8 +26,10 @@ public class UI : MonoBehaviour {
 	}
 
 	void Update () {
+		if (GameMaster.isPaused()) return;
+
 		sw = Screen.width; sh = Screen.height;
-		k = sh / 12;
+		k = sh / 24; GameMaster.SetGUIPiece(k);
 		mousePos = Input.mousePosition;
 		mousePos.y = sh - mousePos.y;
 
@@ -35,6 +44,33 @@ public class UI : MonoBehaviour {
 				chosenResBox = target.GetComponent<ResourcesBox>();
 				if (chosenResBox != null) updateResBoxData = true;
 			} 
+		}
+
+		if (Input.GetKeyDown("m")) {
+			if (mapIsActive) {
+				foreach (GameObject g in mapCells) g.SetActive(false);
+				shipMarker.SetActive(false);
+				mapIsActive = false;
+			}
+			else {
+				if (mapCells == null) {
+					GameMaster.designer.CreateMap(ref mapCells, UI_RENDER_LAYER, out distanceCoefficient);
+					shipMarker = Instantiate(Resources.Load<GameObject>("shipMarker_pref")) as GameObject;
+					shipMarker.transform.parent = UI_camera;
+					//shipMarker.transform.localScale = Vector3.one * radius;
+					shipMarker.transform.localRotation = Quaternion.Euler(0,0,PlayerController.player.transform.rotation.eulerAngles.y * (-1));
+					shipMarker.layer = UI_RENDER_LAYER;
+					shipMarker.SetActive(false);
+				}
+				foreach (GameObject g in mapCells) g.SetActive(true);
+				shipMarker.SetActive(true);
+				mapIsActive = true;
+			}
+		}
+		if (mapIsActive) {
+			Vector3 delta = ScenarioManager.scenarist.GetPlayerPosition() - GameMaster.designer.GetHex(0,0).GetWorldPosition(); delta.y = delta.z; delta.z = -0.005f;
+			shipMarker.transform.localPosition = mapCells[0].transform.localPosition + delta * distanceCoefficient;
+			shipMarker.transform.localRotation = Quaternion.Euler(0,0,PlayerController.player.transform.eulerAngles.y * (-1)) ;		
 		}
 	}
 
@@ -64,7 +100,7 @@ public class UI : MonoBehaviour {
 					
 					Rect box_r;
 					if (n >= 4) box_r= new Rect(rbox_pos.x - n / 2.0f * k, sh - rbox_pos.y - k, n * k, 1.5f*k);
-					else box_r= new Rect(rbox_pos.x -2 * k, sh - rbox_pos.y - k, 4 * k, 1.5f*k);
+					else box_r= new Rect(rbox_pos.x -3 * k, sh - rbox_pos.y - k, 6 * k, 1.5f*k);
 					GUI.Box(box_r, GUIContent.none);
 					Rect info_r = new Rect(box_r.x, box_r.y, k,k);
 					if (!chosenResBox.explored) {
@@ -91,14 +127,21 @@ public class UI : MonoBehaviour {
 							info_r.x += k;
 						}
 					}
-					if (GUI.Button(new Rect(box_r.x + box_r.width - 4 *k, box_r.y + k, 2 *k, k/2), "Send drone")) {
+					if (GUI.Button(new Rect(box_r.x + box_r.width - 6 *k, box_r.y + k, 2 *k, k/2), "Send drone")) {
 						chosenResBox.lootUntilExhausted = false;
 						PlayerController.player.SendDroneToResBox(chosenResBox);
+					}
+					if (GUI.Button(new Rect(box_r.x + box_r.width - 4 *k, box_r.y + k, 2*k, k/2), "Loot")) {
+						PlayerController.player.AddLootPoint(chosenResBox);
+						chosenResBox.lootUntilExhausted = true;
 					}
 					if (GUI.Button(new Rect(box_r.x + box_r.width - 2 *k, box_r.y + k, 2*k, k/2), "Loot all")) {
 						chosenResBox.extractionBitmask = chosenResBox.GetContentBitmask();
 						PlayerController.player.AddLootPoint(chosenResBox);
 						chosenResBox.lootUntilExhausted = true;
+					}
+					if (GUI.Button(new Rect(box_r.x + box_r.width - 4 *k, box_r.y + 1.5f * k, 2*k, k/2), "Stop")) {
+						PlayerController.player.RemoveLootPoint(chosenResBox);
 					}
 					if (GUI.Button(new Rect(box_r.x + box_r.width, box_r.y, k/2, k/2), "+")) {
 						if (chosenResBox.workingDrones < PlayerController.player.transportDrones.Length) chosenResBox.workingDrones++;}

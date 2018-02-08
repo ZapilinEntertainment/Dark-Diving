@@ -3,11 +3,12 @@ using System.Collections.Generic;
 using UnityEngine;
 
 public class Hex  {
-	const float MEDIUM_BLOCK_GEN_CHANCE = 0.3f;
+	const float MEDIUM_BLOCK_GEN_CHANCE = 0.3f, MAIN_OBJECT_RADIUS = 350, MEDIUM_OBJECT_RADIUS = 100, SMALL_OBJECT_RADIUS = 10;
 
 	public int x, y;
 	public float h;
-	GameObject chunk;
+	GameObject chunk, mainObject;
+	List<GameObject> spriteDecorations, smallObjects, mediumObjects;
 	public BiomeType biomeType;
 
 	public Hex() {
@@ -58,6 +59,17 @@ public class Hex  {
 	}
 
 	public void BiomeStructuresGeneration() {
+		smallObjects = new List<GameObject>(); mediumObjects = new List<GameObject>();
+		Vector3[] mediumObjectsPositions = new Vector3[6], smallObjectsPositions = new Vector3[18];
+		Vector3 startVector = Quaternion.AngleAxis(Random.value * 360, Vector3.up) * Vector3.forward;
+		Vector3 startVector_medium = Quaternion.Euler(0,30,0) * startVector;
+		for (int i = 0; i< 6; i++) {
+			mediumObjectsPositions[i] = Quaternion.Euler(0,i * 60,0) * startVector * (MAIN_OBJECT_RADIUS + MEDIUM_OBJECT_RADIUS/2);
+			Vector3 cdir = Quaternion.Euler(0,Random.value * 360, 0) * Vector3.forward * MEDIUM_OBJECT_RADIUS/2;
+			smallObjectsPositions[i*3] = Quaternion.Euler(0, i * 60, 0) * startVector_medium+ cdir;
+			smallObjectsPositions[i*3 + 1] =  Quaternion.Euler(0, i * 60, 0) * startVector_medium + Quaternion.Euler(0,60,0) * cdir;
+			smallObjectsPositions[i*3 + 2] =  Quaternion.Euler(0, i * 60, 0) * startVector_medium + Quaternion.Euler(0,120,0) * cdir;
+		}
 		switch (biomeType) {
 		case BiomeType.city: 
 			float ht = Mathf.Sqrt(3 * 62.5f * 62.5f);
@@ -131,6 +143,12 @@ public class Hex  {
 				}
 				sector.transform.localRotation = Quaternion.Euler(0, k* 60, 0);
 			}
+			break;
+			////
+		case BiomeType.OceanRidge:
+			GameObject gasMount = GameObject.Instantiate(Resources.Load<GameObject>("gasMount_pref") as GameObject);
+			gasMount.transform.position = chunk.transform.position;
+			gasMount.transform.parent = chunk.transform;
 			break;
 		}
 	}

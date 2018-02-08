@@ -6,7 +6,7 @@ public class PoolMaster : MonoBehaviour {
 	
 	public ParticleSystem watersplash2_pref, dustsplash2_pref;
 	public Texture Inventory16cells_tx, item_metal_tx, item_dragmetal_tx, item_plastic_tx, item_electronic_tx, item_chemicals_tx, item_person_tx,
-	item_twoPersons_tx, item_manyPersons_tx, item_VIPperson_tx, item_default_tx;
+	item_twoPersons_tx, item_manyPersons_tx, item_VIPperson_tx, item_default_tx,item_accumulator_empty_tx, item_accumulator_full_tx;
 	public Texture2D wave_tx;
 	ParticleSystem watersplash2, dustsplash2;
 	const int WATERSPLASH2_PARTICLES_COUNT = 70, DUSTSPLASH2_PARTICLES_COUNT = 70;
@@ -22,6 +22,7 @@ public class PoolMaster : MonoBehaviour {
 		if (mainPool != null)  Component.Destroy(mainPool);
 		mainPool = this;
 		//---
+		Localization.ChangeLanguage(Language.Russian);
 		watersplash2 = Instantiate (watersplash2_pref);
 		dustsplash2 = Instantiate (dustsplash2_pref);
 		GameMaster.SetGUIPiece (Screen.height / 36);

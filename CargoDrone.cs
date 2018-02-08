@@ -37,7 +37,7 @@ public class CargoDrone : MonoBehaviour {
 			}
 		}
 		else { //пустой
-			if (target != null) {
+			if (target != null && target.isActiveLootPoint) {
 			// плыть к "руднику"
 			if (Vector3.Distance(transform.position, target.transform.position) < CONTACT_DISTANCE) {//грузим на борт
 				content = target.Extract();

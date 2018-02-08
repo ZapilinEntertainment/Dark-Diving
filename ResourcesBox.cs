@@ -11,6 +11,7 @@ public class ResourcesBox : Destructible {
 	public bool lootUntilExhausted = false;
 	public bool scanned = false;
 	public bool explored = false, generated = false;
+	public bool isActiveLootPoint = false;
 	public int generatorSeed = 0;
 	public float extractionSpeed = 1, speedDegDeclineSpeed = 0.1f;
 	public int workingDrones = 1;
@@ -26,7 +27,6 @@ public class ResourcesBox : Destructible {
 		explored = true;
 		if ((extractionBitmask == 0) || ((contentBitmask & extractionBitmask) == 0)) return null;
 		List <int> acceptableResources = new List <int>();
-		int mask1 = contentBitmask, mask2 = extractionBitmask;
 		for (int i = 0; i< 32; i++) {
 			int idCode = (int)Mathf.Pow(2,i);
 			if (((contentBitmask & idCode) != 0) && ((extractionBitmask & idCode) != 0)) acceptableResources.Add(i);

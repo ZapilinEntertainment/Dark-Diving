@@ -5,24 +5,31 @@ using UnityEngine;
 public class LevelDesigner : MonoBehaviour {
 	const float N_RADIUS = 1730, RADIUS = 1000; // перпендикуляр и радиус
 	const float AVERAGE_DEPTH_NOMINAL =-13800, MAX_HEIGHT = 200, MAX_DEPTH_NOMINAL = - 23000, ACCEPTABLE_DELTA = 150, MAX_GAP_NOMINAL = 2000;
-	const float MAPCELL_NORMAL = 1.1f, SQRT_THREE = 1.73205f;
+	const float MAPCELL_NORMAL = 1.1f;
+	public static readonly float SQRT_THREE;
+	float PLAIN_COEFFICIENT = 0.7f;
+
 	public int circlesCount = 5;
 	float maxDepth, averageDepth,maxGap;
 	public GameObject clearHex;
 	public Vector3 startPos = new Vector3(0, -2000, 0);
 	Hex[,] hex;
+	int rowsCount = 0, columnsCount = 0;
 
 	bool mapEnabled = false;
 	public Transform cameraTransform;
 	public GameObject cellRenderer_pref;
-	GameObject[,] hexRenderers;
 	GameObject shipMarker;
 	public Sprite shipSprite_tx;
 	float mapStartXpos = -0.2f, mapStartYpos = 0.168f,GUISpritesZpos = 0.31f;
-	float mapCoefficient = 0.1f, distanceCoefficient = 0.1f;
+	float mapCoefficient = 0.1f;
 	Color brownColor = new Color (128, 0, 0);
 
 	public GameObject TESTING_HEX;
+
+	static LevelDesigner() {
+		SQRT_THREE = Mathf.Sqrt(3.0f);
+	}
 
 	void Awake () {
 		GameMaster.designer = this;
@@ -31,112 +38,57 @@ public class LevelDesigner : MonoBehaviour {
 	}
 
 	void Start () {
-		int a = circlesCount;
-		int b = (int) (a * 1.732f * 2);
+		rowsCount = circlesCount;
+		columnsCount = (int) (rowsCount * SQRT_THREE* 2);
 		float scaleCoefficient = circlesCount / 36f;
 		maxDepth = MAX_DEPTH_NOMINAL * scaleCoefficient; //print (maxDepth);
 		averageDepth = AVERAGE_DEPTH_NOMINAL * scaleCoefficient; //print (averageDepth);
 		maxGap = MAX_GAP_NOMINAL * scaleCoefficient; if (maxGap < 1000) maxGap = 1000;
 		startPos.y = averageDepth;
-		Gen2(b,a);
-		hexRenderers = new GameObject[b,a];
+		GenerateLandscape();
+	}
 
-		float nearClipSize_y = Camera.main.nearClipPlane * 2 * Mathf.Tan(Camera.main.fieldOfView/2 * Mathf.Deg2Rad);
-		mapCoefficient =nearClipSize_y / (MAPCELL_NORMAL * 2 * b) ;
+	public void CreateMap (ref GameObject[] cellArray, int renderLayer, out  float distanceCoefficient) {
+		float nearClipSize_y = UI.playerUI.UI_camera.GetComponent<Camera>().nearClipPlane * 2 * Mathf.Tan(UI.playerUI.UI_camera.GetComponent<Camera>().fieldOfView/2 * Mathf.Deg2Rad);
+		mapCoefficient = nearClipSize_y / (MAPCELL_NORMAL * 2 * columnsCount) ;
 		float radius = 2 * MAPCELL_NORMAL / SQRT_THREE * mapCoefficient;
 		distanceCoefficient = radius / RADIUS;
-		mapStartXpos = a/2.0f * 3* radius * (-1); mapStartYpos = MAPCELL_NORMAL * mapCoefficient * (b-1);
+		mapStartXpos = rowsCount/2.0f * 3* radius * (-1); mapStartYpos = MAPCELL_NORMAL * mapCoefficient * (columnsCount-1);
 
-		for (int i = 0; i < b; i++) {
-			for (int j = 0; j< a; j++)
+		cellArray = new GameObject[rowsCount * columnsCount];
+		for (int i = 0; i < columnsCount; i++) {
+			for (int j = 0; j< rowsCount; j++)
 			{
-				hexRenderers[i,j] = Instantiate(cellRenderer_pref) as GameObject;
-				hexRenderers[i,j].transform.parent = cameraTransform;
-				hexRenderers[i,j].transform.localScale = Vector3.one * mapCoefficient;
-				hexRenderers[i,j].transform.localRotation = Quaternion.Euler(Vector3.zero);
-				hexRenderers[i,j].transform.localPosition = new Vector3(mapStartXpos + j * 3 * radius, mapStartYpos - i *  radius * SQRT_THREE * 0.5f, GUISpritesZpos);
-				if (i%2 == 0) hexRenderers[i,j].transform.localPosition -=new Vector3(1.5f * radius,0,0);
+				cellArray[i * rowsCount + j] = Instantiate(cellRenderer_pref) as GameObject;
+				cellArray[i * rowsCount + j].transform.parent = UI.playerUI.UI_camera;
+				cellArray[i * rowsCount + j].transform.localScale = Vector3.one * mapCoefficient;
+				cellArray[i * rowsCount + j].transform.localRotation = Quaternion.Euler(Vector3.zero);
+				cellArray[i * rowsCount + j].transform.localPosition = new Vector3(mapStartXpos + j * 3 * radius, mapStartYpos - i *  radius * SQRT_THREE * 0.5f, GUISpritesZpos);
+				if (i%2 == 0) cellArray[i * rowsCount + j].transform.localPosition -=new Vector3(1.5f * radius,0,0);
 				if (hex[i,j].h <= 0) {
-					hexRenderers[i,j].GetComponent<SpriteRenderer>().color = Color.Lerp(Color.white, Color.blue, hex[i,j].h/maxDepth);
+					cellArray[i * rowsCount + j].GetComponent<SpriteRenderer>().color = Color.Lerp(Color.white, Color.blue, hex[i,j].h/maxDepth);
 				}
 				else {
-					hexRenderers[i,j].GetComponent<SpriteRenderer>().color = Color.Lerp(Color.white,brownColor , hex[i,j].h/500.0f);
+					cellArray[i * rowsCount + j].GetComponent<SpriteRenderer>().color = Color.Lerp(Color.white,brownColor , hex[i,j].h/500.0f);
 				}
-				hexRenderers[i,j].name = "cell "+i.ToString()+','+j.ToString();
-				hexRenderers[i,j].gameObject.SetActive(false);
-			}
-		}
-		shipMarker = Instantiate(cellRenderer_pref) as GameObject;
-		shipMarker.transform.parent = cameraTransform;
-		//shipMarker.transform.localScale = Vector3.one * radius;
-		shipMarker.transform.localRotation = Quaternion.Euler(0,0,ScenarioManager.scenarist.GetPlayerRotation().eulerAngles.y * (-1));
-		shipMarker.GetComponent<SpriteRenderer>().sprite = shipSprite_tx;
-		shipMarker.SetActive(false);
-	}
-
-	void Update () {
-		if (GameMaster.isPaused()) return;
-		if (Input.GetKeyDown("m")) {
-			int a= hex.GetLength(0), b= hex.GetLength(1);
-			if (mapEnabled)
-			{
-				for (int i = 0; i < a; i++) {
-					for (int j = 0; j< b; j++)
-					{hexRenderers[i,j].gameObject.SetActive(false);}
-			}
-				shipMarker.SetActive(false);
-				mapEnabled = false;
-		}
-			else
-			{
-				for (int i = 0; i < a; i++) {
-					for (int j = 0; j< b; j++)
-					{hexRenderers[i,j].gameObject.SetActive(true);}
-				} 
-				shipMarker.SetActive(true);
-				mapEnabled = true;}
-	}
-	}
-
-	void LateUpdate() {
-		if (GameMaster.isPaused()) return;
-		if (mapEnabled) {
-			Vector3 delta = ScenarioManager.scenarist.GetPlayerPosition() - hex[0,0].GetWorldPosition(); delta.y = delta.z; delta.z = -0.005f;
-			shipMarker.transform.localPosition = hexRenderers[0,0].transform.localPosition + delta * distanceCoefficient;
-			shipMarker.transform.localRotation = Quaternion.Euler(0,0,ScenarioManager.scenarist.GetPlayerRotation().eulerAngles.y * (-1)) ;		
-		}
-	}
-
-	void Gen1 () {
-		GameObject g = Instantiate(clearHex, startPos, Quaternion.identity) as GameObject;
-		g.name = "(0,0)";
-		float rad = 0;
-		Vector3 pos = startPos;
-		for (int n = 0; n < circlesCount; n++) {
-			int hexCount = 6;
-			for (int i = 0; i < hexCount; i++ ) {
-				float fi = i;
-				rad = fi/hexCount * Mathf.PI * 2 ;
-				pos.x = Mathf.Cos(rad) * N_RADIUS* (1 + n);
-				pos.z = Mathf.Sin(rad) * N_RADIUS* (1 + n);
-				pos.y += Random.value * N_RADIUS / 10;
-				g = Instantiate(clearHex, pos,Quaternion.identity) as GameObject;
-				g.name = "("+(n+1).ToString()+','+((int)(rad * Mathf.Rad2Deg)).ToString() +")";
+				cellArray[i * rowsCount + j].name = "cell "+i.ToString()+','+j.ToString();
+				cellArray[i * rowsCount + j].layer = renderLayer;
+				cellArray[i * rowsCount + j].gameObject.SetActive(false);
 			}
 		}
 	}
 
-	void Gen2 (int width,int height) {  //CURRENT GENERATOR
-		hex = new Hex[width, height];
+	void GenerateLandscape() {  //CURRENT GENERATOR
+		hex = new Hex[columnsCount, rowsCount];
 		GameObject g; 
 		string nm = "";
 		Vector3 pos = startPos;
-		for (int i = 0; i< width; i++)
+		for (int i = 0; i< columnsCount; i++)
 		{
 			pos = startPos;
 			pos.z -= N_RADIUS/2 * i;
 			if (i%2 != 0) pos.x += 1.5f * RADIUS;
-		for (int j = 0; j < height; j++) {
+			for (int j = 0; j < rowsCount; j++) {
 			g= Instantiate(clearHex, pos, Quaternion.identity) as GameObject;
 				//print (i.ToString()+" "+j.ToString());
 			nm = i.ToString();
@@ -152,12 +104,65 @@ public class LevelDesigner : MonoBehaviour {
 		HeightsGeneration();
 
 		foreach (Hex h in hex) {
-			if (h.h > AVERAGE_DEPTH_NOMINAL && h.h < MAX_HEIGHT / 2) { //acceptable height for city
-				if (Random.value > 0.9f) {
-					h.biomeType = BiomeType.city;
-					h.BiomeStructuresGeneration();
+			BiomeType hexType = BiomeType.empty;
+			if (h.h < AVERAGE_DEPTH_NOMINAL) { // under the surface
+				float depth = h.h - AVERAGE_DEPTH_NOMINAL;
+				if (depth < - 3000) {
+					if (depth > - 4000) h.biomeType = BiomeType.ContinentalFoot;
+					else {
+						if (depth < -6000) h.biomeType = BiomeType.OceanGutter;
+						else {if (Random.value < PLAIN_COEFFICIENT) h.biomeType = BiomeType.AbyssalPlain; else h.biomeType = BiomeType.OceanRidge;}
+					}
+				}
+				else {
+					if (depth < -200) h.biomeType = BiomeType.Shelf; else h.biomeType = BiomeType.ContinentalSlope;
 				}
 			}
+			else { // land
+				float height = h.h;
+				if (height > 200) {
+					if (height > 1000) {
+						if (Random.value < PLAIN_COEFFICIENT) h.biomeType = BiomeType.HighPlains; else h.biomeType = BiomeType.Mountains;
+					}
+					else h.biomeType = BiomeType.Hills;
+				}
+				else {
+					if (height < 50) h.biomeType = BiomeType.CoastalArea;
+					else {
+					if (Random.value > PLAIN_COEFFICIENT) h.biomeType = BiomeType.Hills; else h.biomeType = BiomeType.Plains;
+					}
+				}
+			}
+			switch (hexType) {
+			case BiomeType.HighPlains: break;
+			case BiomeType.Mountains: break;
+			case BiomeType.Hills:
+				if (Random.value > 0.1f) {
+					h.biomeType = BiomeType.city;
+				}
+				break;
+			case BiomeType.Plains:
+				if (Random.value > 0.3f) {
+					h.biomeType = BiomeType.city;
+				}
+				break;
+			case BiomeType.CoastalArea :
+				if (Random.value > 0.2f) {
+					h.biomeType = BiomeType.city;
+				}
+				break;
+			case BiomeType.Shelf :
+				break;
+			case BiomeType.ContinentalSlope:
+				break;
+			case BiomeType.ContinentalFoot:
+				break;
+			case BiomeType.AbyssalPlain:
+				break;
+			case BiomeType.OceanRidge:
+				break;
+			}
+			h.BiomeStructuresGeneration();
 		}
 	}
 

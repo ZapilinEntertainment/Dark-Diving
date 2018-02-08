@@ -4,7 +4,7 @@ using UnityEngine;
 
 public class PlayerController : MonoBehaviour {
 	const float ROTATION_SMOOTH_CF = 0.2f, SINK_SPEED = 9,SINKING_SMOOTH_CF = 1.1f, NATURAL_GRAVITY = 9.8f, NATURAL_WATER_MITIGATION = 3,
-	CRITICAL_X_ANGLE = 30, FORCE_CONSTANCE_TIMER = 0.04f;
+	CRITICAL_X_ANGLE = 30, FORCE_CONSTANCE_TIMER = 0.04f, SCREW_ROTATION_SPEED = 100;
 	//mitigation - смягчить (уменьшение гравитации при падении в воду)
 	public float sinkSmooth = 0, rotationSmooth = 0;
 
@@ -26,12 +26,6 @@ public class PlayerController : MonoBehaviour {
 	public CapsuleCollider mainCollider; 
 	public GameObject marker;
 
-	public Material myMaterial;
-	float prevDepth;
-	public Color underwaterColor;
-
-	public Light projector1, projector2;
-
 	int modulesCount = 6;
 	bool showInventory = false;
 	int sh,sw;
@@ -51,11 +45,15 @@ public class PlayerController : MonoBehaviour {
 	public float shortRangeScanner = 300, shortScannerCost = 10;
 
 	public CargoDrone[] transportDrones;
-	public Vector3 droneHangarPos = new Vector3(0,0, - 15);
+	public Vector3 droneHangarPos = new Vector3(0,0, - 15), outerHatch = new Vector3(0,0,40);
 	List <ResourcesBox> plannedLootPoints;
 
-	public Transform leftFin, rightFin,fin;
+	public Transform leftFin, rightFin,fin, leftScrew, rightScrew;
+	public ParticleSystem leftScrewPS, rightScrewPS;
 	bool speedBlocked = false;
+	float prevSpeed;
+
+	Texture batteryFrame_tx, batteryInnerParts_tx, energyWarning_tx,energyCriticalWarning_tx;
 
 	public static PlayerController player;
 
@@ -63,17 +61,19 @@ public class PlayerController : MonoBehaviour {
 		//singleton pattern
 		if (player != null) Destroy(player);
 		player = this;
-		ScenarioManager.scenarist.SetPlayer(gameObject);
+
+		batteryFrame_tx = Resources.Load<Texture>("Textures/GUI/batteryFrame_tx"); batteryInnerParts_tx = Resources.Load<Texture>("Textures/GUI/batteryInnerParts_tx");
+		energyWarning_tx = Resources.Load<Texture>("Textures/GUI/energyWarning_tx"); energyCriticalWarning_tx = Resources.Load<Texture>("Textures/GUI/energyCriticalWarning_tx");
 
 		height = transform.position.y;
 		prevHeight = height;
 		hullPoints = maxHullPoints;
-		energy = energyCapacity;
+		energy = energyCapacity ;
 		length = mainCollider.height ;
 		volume = draft * 2 * length * width;
 		//marker.transform.position = transform.TransformPoint(Vector3.forward * length / modules.Length );
 		modules = new Module[modulesCount];
-		sw = Screen.width; sh= Screen.height; int k = GameMaster.GetGUIPiece();
+		sw = Screen.width; sh= Screen.height; float k = GameMaster.GetGUIPiece();
 		Module.MODULE_INFO_RECT = new Rect(sw - 10 *k, sh - 10*k, 10*k, 10*k);
 		for (int i =0; i< modulesCount; i++)
 		{
@@ -88,6 +88,7 @@ public class PlayerController : MonoBehaviour {
 		modules[0].AddItem(Item.item_electronic);
 		modules[0].AddItem(Item.item_plastic);
 		modules[0].AddItem(Item.item_people);
+		modules[0].AddItem(Item.item_accumulator_full);
 
 		transportDrones = new CargoDrone[6];
 		GameObject dronePref = Resources.Load<GameObject>("cargoDrone_pref");
@@ -99,13 +100,15 @@ public class PlayerController : MonoBehaviour {
 		}
 		plannedLootPoints = new List<ResourcesBox>();
 
-		gameObject.AddComponent<UI>();
+		UI myUI = gameObject.AddComponent<UI>();
+		myUI.UI_camera = GameObject.Find("UI_camera").transform;
 	}
 
 	void Update () {
 
+
 		//testzone
-		if (Input.GetKeyDown("g")) modules[0].AddItem(Item.item_people);
+		//if (Input.GetKeyDown("g")) modules[0].AddItem(Item.item_people);
 		//end of testzone
 		GameMaster.cursorPosition = new Vector2(Input.mousePosition.x, sh - Input.mousePosition.y);
 		if (GameMaster.isPaused()) return;
@@ -113,7 +116,6 @@ public class PlayerController : MonoBehaviour {
 		moveVector =Vector3.zero;
 		int directionVectorsCount = 0;
 
-		if (Input.GetKeyDown("p")) {projector1.enabled = !projector1.enabled;projector2.enabled = projector1.enabled;}
 		if (Input.GetKeyDown("i")) {
 			showInventory = !showInventory;
 			foreach (Module m in modules) {
@@ -143,7 +145,7 @@ public class PlayerController : MonoBehaviour {
 
 					if (Input.GetKey ("e")) {
 						if (ballastMass < maxBallastMass) {
-							ballastMass += pumpInSpeed * pressure;
+							ballastMass += pumpInSpeed *(1 + pressure/10);
 							energy -= pumpConsumption * t;
 						}
 						Differenting (t);
@@ -325,10 +327,35 @@ public class PlayerController : MonoBehaviour {
 			}
 			if (blocked ==false) transform.Translate(Vector3.forward * speed * Time.deltaTime, Space.Self);
 			if (bottomDistance < 1.2f) PoolMaster.mainPool.Dustsplash2At(transform.position);
+			leftScrew.Rotate(Vector3.forward * speed *SCREW_ROTATION_SPEED * t);
+			rightScrew.Rotate(Vector3.forward * speed *SCREW_ROTATION_SPEED * t);
+
+			if (leftScrew.position.y > waterlevel) {if (leftScrewPS.isPlaying) leftScrewPS.Stop();} else {if (!leftScrewPS.isPlaying) leftScrewPS.Play();}
+			if (rightScrew.position.y > waterlevel) {if (rightScrewPS.isPlaying) rightScrewPS.Stop();} else {if (!rightScrewPS.isPlaying) rightScrewPS.Play();}
+			if (prevSpeed != speed) {
+				float screw_effects_cf = speed / maxSpeed;
+				var main = leftScrewPS.main;
+				main.startLifetimeMultiplier = 0.5f + screw_effects_cf;
+				//main.startSpeedMultiplier = 0.3f;
+				main.startSize = new ParticleSystem.MinMaxCurve(1, 4 + screw_effects_cf);
+				main = rightScrewPS.main;
+				main.startLifetimeMultiplier = 0.5f + screw_effects_cf;
+				//main.startSpeedMultiplier = 0.3f;
+				main.startSize = new ParticleSystem.MinMaxCurve(1, 4 + screw_effects_cf);
+				var emissionModule = leftScrewPS.emission;
+				emissionModule.rateOverTimeMultiplier = 5 + screw_effects_cf * 45;
+				emissionModule = rightScrewPS.emission;
+				emissionModule.rateOverTimeMultiplier = 5 + screw_effects_cf * 45;
+			}
+		}
+		else {
+			if (leftScrewPS.isPlaying) leftScrewPS.Stop();
+			if (rightScrewPS.isPlaying) rightScrewPS.Stop();
 		}
 
 		if (directionVectorsCount != 0)	transform.position += moveVector / directionVectorsCount;
 		sea.position = new Vector3(transform.position.x, 0, transform.position.z) + seaCorrectionVector;
+		prevSpeed =speed; 
 	}
 
 	void Differenting (float t) {
@@ -373,13 +400,13 @@ public class PlayerController : MonoBehaviour {
 		}
 		return false;
 	}
-
-	public bool ConsumeEnergy (float f) {if (energy - f >= 0) {energy-= f; return true;} else return false;}
+		
 
 	public void AddLootPoint (ResourcesBox source) {
 		if (source == null || source.extractionBitmask == 0 || transportDrones.Length == 0) return;
 		if (plannedLootPoints.Count > 0) { foreach (ResourcesBox rb in plannedLootPoints) {if (rb == source) return;}}
 		plannedLootPoints.Add(source);
+		source.isActiveLootPoint = true;
 		if (source.workingDrones > 0 ) {
 		int activeDronesCount = 0;
 		foreach (CargoDrone c in transportDrones) {if (c.gameObject.activeSelf) activeDronesCount++;}
@@ -413,12 +440,17 @@ public class PlayerController : MonoBehaviour {
 	public ResourcesBox GetLootPoint () {
 		if (plannedLootPoints == null || plannedLootPoints.Count == 0 ) return null;
 		ResourcesBox answer = null;
-		print (plannedLootPoints.Count);
 		for (int i =0; i< plannedLootPoints.Count;i++) {
-			if (plannedLootPoints[i].BitmasksConjuction() == 0) plannedLootPoints.RemoveAt(i);
+			if (plannedLootPoints[i].BitmasksConjuction() == 0) {plannedLootPoints[i].isActiveLootPoint = false; plannedLootPoints.RemoveAt(i);}
 			else {answer = plannedLootPoints[i]; break;}
 		}
 		return answer;
+	}
+	public void RemoveLootPoint(ResourcesBox rb) {
+		if (rb == null || plannedLootPoints == null || plannedLootPoints.Count == 0) return;
+		for (int i =0; i < plannedLootPoints.Count; i++) {
+			if (plannedLootPoints[i] == rb) {plannedLootPoints[i].isActiveLootPoint = false; plannedLootPoints.RemoveAt(i);}
+		}
 	}
 
 	public void SendDroneToResBox (ResourcesBox rbox) {
@@ -438,6 +470,9 @@ public class PlayerController : MonoBehaviour {
 			drone.changeDestinationAfterHaul = true;
 		}
 	}
+
+	public bool ConsumeEnergy (float f) {if (energy - f >= 0) {energy-= f; return true;} else return false;}
+	public void RestoreEnergy () { energy = energyCapacity;}
 		
 
 	void OnGUI () {
@@ -447,12 +482,22 @@ public class PlayerController : MonoBehaviour {
 		GUILayout.Label("Текущая глубина: "+ height.ToString()+"u");
 
 		if (!mainSkinSet) {GUI.skin.font = mainSkin.font;}
-		int k = GameMaster.GetGUIPiece();
-		Rect rightPanelRect = new Rect (0, sh - k, 6*k, k);
+		float k = GameMaster.GetGUIPiece() * 2;
+		Rect rightPanelRect = new Rect (k, sh - k, 6*k, k);
 		GUI.DrawTexture (rightPanelRect, partsFrame_tx, ScaleMode.StretchToFill); rightPanelRect.y -= k/2; rightPanelRect.height = k/2;
+		GUI.skin.GetStyle("Label").fontSize = (int)(k/3.0f);
 		GUI.Label (rightPanelRect, "Прочность корпуса: " + Mathf.FloorToInt(hullPoints/maxHullPoints * 100).ToString() + '%');
 		rightPanelRect.y -= k/2;
 		GUI.Label (rightPanelRect, "Энергия : " + (Mathf.FloorToInt(energy/energyCapacity * 10000) / 100.00f ).ToString() + '%');
+
+		float ek = energy/energyCapacity;
+		GUI.DrawTexture(new Rect(0, sh - 2*k * ek, k, 2*k*ek), batteryInnerParts_tx, ScaleMode.ScaleAndCrop);
+		GUI.DrawTexture(new Rect(0,sh-2*k,k,2*k),batteryFrame_tx,ScaleMode.StretchToFill);
+		Rect energyWarningRect = new Rect(sw/2,0,k,k);
+		if (ek  < 0.25f) {
+			if (ek > 0.1f) GUI.DrawTexture(energyWarningRect, energyWarning_tx,ScaleMode.ScaleToFit);
+			else GUI.DrawTexture(energyWarningRect, energyCriticalWarning_tx,ScaleMode.ScaleToFit);
+		}
 	}
 
 

@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using UnityEngine;
 
 public class ScenarioManager : MonoBehaviour {
-	GameObject player;
 	Vector3 playerPos;
 	Hex currentLocation;
 	float hexUpdateTime = 1.5f, t = 0;
@@ -16,7 +15,7 @@ public class ScenarioManager : MonoBehaviour {
 		
 
 	void Update () {
-		playerPos = player.transform.position;
+		playerPos = PlayerController.player.transform.position;
 		if (t == 0) {
 			RaycastHit rh;
 			int layerMask = 1 << 9;
@@ -35,11 +34,7 @@ public class ScenarioManager : MonoBehaviour {
 			if (t < 0) t = 0;
 		}
 	}
-
-	public void SetPlayer (GameObject g) {player = g;}
+		
 	public Vector3 GetPlayerPosition() {return playerPos;}
-	public Vector3 GetPlayerRotationEuler() {return player.transform.rotation.eulerAngles;}
-	public Quaternion GetPlayerRotation() {return player.transform.rotation;}
 	public Hex GetCurrentHex() {return currentLocation;}
-	public Vector3 GetPlayerForward() {return player.transform.forward;}
 }

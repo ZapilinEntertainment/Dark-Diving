@@ -2,7 +2,9 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public enum BiomeType {empty, hills, city};
+public enum BiomeType {empty, city, HighPlains, Mountains, Hills, Plains, CoastalArea, Shelf, ContinentalSlope, 
+	ContinentalFoot, AbyssalPlain, OceanRidge, OceanGutter
+};
 
 public class Biome {
 	

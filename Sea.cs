@@ -91,7 +91,7 @@ public class Sea : MonoBehaviour {
 			{
 				p = j; p /= innerSquareResolution; 
 				nv[ i * innerSquareResolution + j].y = Mathf.Sin((t+p) * waveCount*Mathf.PI * 2) * waveScale;
-				//nv[ i * innerSquareResolution + j].y += Mathf.PerlinNoise(nv[ i * innerSquareResolution + j].x +movementCorrection.z + noiseWalk, nv[ i * innerSquareResolution + j].y + Mathf.Sin((t+movementCorrection.x) * 0.2f * Mathf.PI) + movementCorrection.z) * noiseStrength;
+				nv[ i * innerSquareResolution + j].y += Mathf.PerlinNoise(nv[ i * innerSquareResolution + j].x +movementCorrection.z + noiseWalk, nv[ i * innerSquareResolution + j].y + Mathf.Sin((t+movementCorrection.x) * 0.2f * Mathf.PI) + movementCorrection.z) * noiseStrength;
 			}
 		}
 		mf.mesh.vertices = nv;

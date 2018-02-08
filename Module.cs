@@ -8,7 +8,7 @@ public class Module : MonoBehaviour {
 	public static readonly int SMALL_MODULE_CAPACITY = 16;
 	public static float HUMAN_WALKING_ACTIVITY = 0.2f;
 	public static Rect MODULE_INFO_RECT;
-	public int f_number, f_maxCapacity, f_realCapacity;
+	public int f_number, f_maxCapacity, f_realCapacity,hoveredItemIndex = -1, focusedItemIndex = -1;
 	public bool showOnGUI = false;
 	Item[] storage;
 	Rect iconRect, storageRect;
@@ -16,7 +16,7 @@ public class Module : MonoBehaviour {
 	ModuleType f_type = ModuleType.Empty;
 	bool havePeopleOnboard = false;
 	PlayerController pc;
-	float humanActivityTimer = 10, humanActivityDelay = 60;
+	float humanActivityTimer = 10, humanActivityDelay = 60,k;
 
 
 
@@ -78,6 +78,7 @@ public class Module : MonoBehaviour {
 
 	public void RemoveItem (int index) {
 		if (index <0 || index > f_realCapacity || storage[index] == null) return;
+		print (storage[index].f_name + " removed");
 		storage[index] = null;
 		havePeopleOnboard = false;
 		foreach (Item it in storage) {
@@ -86,7 +87,12 @@ public class Module : MonoBehaviour {
 	}
 
 	public void Update() {
+		if (Input.GetMouseButtonDown(0)) focusedItemIndex = GetFocusedCellNumber();
+		k = GameMaster.GetGUIPiece();
+
 		if (GameMaster.isPaused()) return;
+
+		hoveredItemIndex = GetFocusedCellNumber();
 		if (havePeopleOnboard) {
 			if (humanActivityTimer > 0) humanActivityTimer-=Time.deltaTime;
 			if (humanActivityTimer <= 0) {
@@ -111,8 +117,18 @@ public class Module : MonoBehaviour {
 		}
 	}
 
+	int GetFocusedCellNumber () {
+		Vector2 curpos = GameMaster.cursorPosition;
+		if (curpos.x > storageRect.x && curpos.x < storageRect.x + storageRect.width && curpos.y > storageRect.y && curpos.y < storageRect.y + storageRect.height) {
+			int i = (int) ((curpos.x - storageRect.x) / (storageRect.height/2));
+			if (curpos.y > storageRect.y + storageRect.height / 2) i += (int)(storage.Length / 2);
+			return i;
+		}
+		else return -1;
+	}
+
 	void OnGUI() {
-		int sw = Screen.width;
+		int sw = Screen.width, sh = Screen.height;
 		if (GameMaster.isPaused()) return;
 		if (f_type != ModuleType.Empty && moduleTexture!= null) GUI.DrawTexture(iconRect, moduleTexture,ScaleMode.StretchToFill);
 		if (showOnGUI) {
@@ -120,19 +136,19 @@ public class Module : MonoBehaviour {
 			GUI.DrawTexture(storageRect, PoolMaster.mainPool.Inventory16cells_tx,ScaleMode.StretchToFill);
 
 			float itemCell = storageRect.height / 2;
+			if (focusedItemIndex != -1) GUI.DrawTexture(new Rect(storageRect.x + focusedItemIndex%(storage.Length/2.0f) * itemCell, storageRect.y + focusedItemIndex/(storage.Length/2) * itemCell, itemCell,itemCell), PoolMaster.mainPool.choosingFrame_tx, ScaleMode.StretchToFill);
 			Rect itemRect = new Rect(realPosX, storageRect.y, itemCell, itemCell);
-			for (int k = 0; k < f_realCapacity; k++) {
-				if (storage[k] != null) {
-					GUI.DrawTexture(itemRect, storage[k].item_tx, ScaleMode.StretchToFill);
+			for (int j = 0; j< f_realCapacity; j++) {
+				if (storage[j] != null) {
+					GUI.DrawTexture(itemRect, storage[j].item_tx, ScaleMode.StretchToFill);
 				}
 				itemRect.x += itemCell; if (itemRect.x >= sw) {itemRect.x = realPosX; itemRect.y += itemCell;}
 			}
-			Vector2 curpos = GameMaster.cursorPosition;
-			if (curpos.x > realPosX) {
-				if (curpos.y > storageRect.y && curpos.y < storageRect.y + storageRect.height) {
-					int i = (int) ((curpos.x - storageRect.x) / itemCell);
-					if (curpos.y > storageRect.y + storageRect.height / 2) i += (int)(storage.Length / 2);
-					if (i < storage.Length && storage[i] != null) {
+					
+			int i  = -1; bool focused = false;
+			if (focusedItemIndex == -1) i =hoveredItemIndex; else {i = focusedItemIndex; focused = true;}
+			GUI.skin.GetStyle("Button").fontSize = (int)(k/6.0f);
+			if (i != -1 && i < storage.Length && storage[i] != null) {
 						Rect r = MODULE_INFO_RECT;
 						r.width = MODULE_INFO_RECT.width / 2; r.height = MODULE_INFO_RECT.height / 2;
 						GUI.DrawTexture(r, storage[i].item_tx, ScaleMode.StretchToFill);
@@ -143,9 +159,17 @@ public class Module : MonoBehaviour {
 						r.width = MODULE_INFO_RECT.width;
 						r.height = MODULE_INFO_RECT.height;
 						GUI.Label(r, storage[i].f_description);
+				if (focused) {
+					if (GUI.Button (new Rect(MODULE_INFO_RECT.x , sh - k ,k *2, k), Localization.item_button_drop)) RemoveItem(i);
+					if (storage[i].type == ItemType.SingleUse) {
+						Rect br = new Rect(MODULE_INFO_RECT.x + 2* k , sh - k ,k * 2, k);
+						switch (storage[i].itemId) {
+						case Item.CAPACITOR_FULL_ID: if (GUI.Button(br, Localization.general_use)) storage[i].Discharge();	break;
+						case Item.CAPACITOR_EMPTY_ID: if (GUI.Button(br, Localization.general_use)) storage[i].Recharge();	break;
+						}
 					}
 				}
-			}
+					}
 		}
 	}
 }
